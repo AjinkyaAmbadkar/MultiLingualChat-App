@@ -1,4 +1,4 @@
-package com.multilingual.chat.app.repository;
+package com.multilingual.chat.app.service;
 
 public interface TranslationService {
 

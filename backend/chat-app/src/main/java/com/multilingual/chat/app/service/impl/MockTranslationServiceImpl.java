@@ -1,7 +1,6 @@
 package com.multilingual.chat.app.service.impl;
 
 import org.springframework.stereotype.Service;
-
 import com.multilingual.chat.app.service.TranslationService;
 
 @Service

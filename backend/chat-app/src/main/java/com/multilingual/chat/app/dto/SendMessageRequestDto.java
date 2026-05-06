@@ -14,7 +14,8 @@ public class SendMessageRequestDto {
     @NotBlank(message = "Original Text is required")
     private String originalText;
 
-    private String translatedText;
+    // translatedText removed — the server now calls OpenAI to generate this automatically.
+    // Clients only send the original message + source/target language.
 
     @NotBlank(message = "Original language is required")
     private String originalLanguage;
@@ -48,14 +49,6 @@ public class SendMessageRequestDto {
 
     public void setOriginalText(String originalText) {
         this.originalText = originalText;
-    }
-
-    public String getTranslatedText() {
-        return translatedText;
-    }
-
-    public void setTranslatedText(String translatedText) {
-        this.translatedText = translatedText;
     }
 
     public String getOriginalLanguage() {
