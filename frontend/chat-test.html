@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MultiLingual Chat — WebSocket Test</title>
+
+  <!--
+    STOMP.js  — the JavaScript STOMP client (matches what Spring Boot uses server-side)
+    SockJS    — the JavaScript SockJS client (matches withSockJS() in WebSocketConfig.java)
+    We load them from CDN so no npm/build step is needed.
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@6/bundles/stomp.umd.min.js"></script>
+
+  <style>
+    /* ── Reset & base ───────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f0f2f5;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── Layout ─────────────────────────────────────────── */
+    .app {
+      width: 420px;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 90vh;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    header {
+      background: #075e54;
+      color: #fff;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .avatar {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      background: #128c7e;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: bold;
+    }
+    header h1 { font-size: 16px; font-weight: 600; }
+    header p  { font-size: 12px; opacity: 0.75; margin-top: 2px; }
+    .status-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: #f44336;   /* red = disconnected */
+      margin-left: auto;
+      flex-shrink: 0;
+      transition: background .3s;
+    }
+    .status-dot.connected { background: #4caf50; }  /* green = connected */
+
+    /* ── Connect panel ──────────────────────────────────── */
+    #connect-panel {
+      padding: 20px;
+      border-bottom: 1px solid #e9edef;
+      background: #fafafa;
+    }
+    #connect-panel h2 { font-size: 13px; color: #667781; margin-bottom: 10px; text-transform: uppercase; letter-spacing: .5px; }
+    .field-row { display: flex; gap: 8px; margin-bottom: 8px; }
+    .field-row label { font-size: 12px; color: #667781; display: block; margin-bottom: 3px; }
+    .field-row input, .field-row select {
+      flex: 1;
+      padding: 8px 10px;
+      border: 1px solid #d1d7db;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fff;
+      outline: none;
+    }
+    .field-row input:focus, .field-row select:focus { border-color: #075e54; }
+    #btn-connect {
+      width: 100%;
+      padding: 9px;
+      background: #075e54;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    #btn-connect:hover  { background: #128c7e; }
+    #btn-connect:disabled { background: #aaa; cursor: not-allowed; }
+
+    /* ── Message window ─────────────────────────────────── */
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: #efeae2;   /* WhatsApp chat background */
+    }
+    .bubble-wrapper {
+      display: flex;
+      flex-direction: column;
+    }
+    .bubble-wrapper.sent  { align-items: flex-end; }
+    .bubble-wrapper.recv  { align-items: flex-start; }
+
+    .bubble {
+      max-width: 78%;
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 14px;
+      line-height: 1.4;
+      position: relative;
+      word-break: break-word;
+    }
+    .bubble.sent {
+      background: #d9fdd3;
+      border-top-right-radius: 2px;
+    }
+    .bubble.recv {
+      background: #fff;
+      border-top-left-radius: 2px;
+    }
+    .bubble .original {
+      font-size: 12px;
+      color: #888;
+      margin-top: 4px;
+      border-top: 1px solid rgba(0,0,0,.07);
+      padding-top: 3px;
+    }
+    .bubble .meta {
+      font-size: 10px;
+      color: #999;
+      margin-top: 4px;
+      text-align: right;
+    }
+    .system-msg {
+      text-align: center;
+      font-size: 11px;
+      color: #667781;
+      background: rgba(255,255,255,.6);
+      border-radius: 8px;
+      padding: 4px 10px;
+      align-self: center;
+    }
+
+    /* ── Send bar ───────────────────────────────────────── */
+    #send-bar {
+      padding: 10px 12px;
+      background: #f0f2f5;
+      border-top: 1px solid #e9edef;
+    }
+    .send-top { display: flex; gap: 8px; margin-bottom: 8px; }
+    .send-top input, .send-top select {
+      flex: 1;
+      padding: 8px 10px;
+      border: 1px solid #d1d7db;
+      border-radius: 8px;
+      font-size: 13px;
+      background: #fff;
+      outline: none;
+    }
+    .send-top input:focus, .send-top select:focus { border-color: #075e54; }
+    .send-bottom { display: flex; gap: 8px; }
+    #msg-input {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid #d1d7db;
+      border-radius: 22px;
+      font-size: 14px;
+      background: #fff;
+      outline: none;
+    }
+    #msg-input:focus { border-color: #075e54; }
+    #btn-send {
+      width: 42px; height: 42px;
+      border-radius: 50%;
+      background: #075e54;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-size: 18px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .2s;
+      flex-shrink: 0;
+    }
+    #btn-send:hover    { background: #128c7e; }
+    #btn-send:disabled { background: #aaa; cursor: not-allowed; }
+
+    /* ── Log panel ──────────────────────────────────────── */
+    details {
+      border-top: 1px solid #e9edef;
+      background: #fafafa;
+    }
+    summary {
+      padding: 8px 14px;
+      font-size: 11px;
+      color: #667781;
+      cursor: pointer;
+      user-select: none;
+    }
+    #log {
+      max-height: 120px;
+      overflow-y: auto;
+      padding: 0 14px 8px;
+      font-size: 11px;
+      font-family: monospace;
+      color: #333;
+    }
+    #log .log-info  { color: #075e54; }
+    #log .log-error { color: #f44336; }
+    #log .log-recv  { color: #0077cc; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <header>
+    <div class="avatar" id="avatar">?</div>
+    <div>
+      <h1 id="header-name">MultiLingual Chat</h1>
+      <p id="header-sub">Not connected</p>
+    </div>
+    <div class="status-dot" id="status-dot"></div>
+  </header>
+
+  <!-- Connect Panel -->
+  <div id="connect-panel">
+    <h2>Connect as a user</h2>
+    <div class="field-row">
+      <div style="flex:1">
+        <label>My User ID (from DB)</label>
+        <input id="my-user-id" type="number" placeholder="e.g. 1" min="1"/>
+      </div>
+      <div style="flex:1">
+        <label>My Name (display only)</label>
+        <input id="my-name" type="text" placeholder="e.g. Ajinkya"/>
+      </div>
+    </div>
+    <div class="field-row">
+      <div style="flex:1">
+        <label>My Language</label>
+        <select id="my-lang">
+          <option value="English">English</option>
+          <option value="Spanish">Spanish</option>
+          <option value="French">French</option>
+          <option value="German">German</option>
+          <option value="Hindi">Hindi</option>
+          <option value="Marathi">Marathi</option>
+          <option value="Japanese">Japanese</option>
+          <option value="Portuguese">Portuguese</option>
+          <option value="Mandarin">Mandarin</option>
+        </select>
+      </div>
+    </div>
+    <button id="btn-connect">Connect</button>
+  </div>
+
+  <!-- Chat Messages -->
+  <div id="messages">
+    <div class="system-msg">Connect above to start chatting 💬</div>
+  </div>
+
+  <!-- Send Bar -->
+  <div id="send-bar">
+    <div class="send-top">
+      <div style="flex:1">
+        <input id="to-user-id" type="number" placeholder="Send to User ID" min="1"/>
+      </div>
+      <div style="flex:1">
+        <select id="to-lang">
+          <option value="Spanish">→ Spanish</option>
+          <option value="English">→ English</option>
+          <option value="French">→ French</option>
+          <option value="German">→ German</option>
+          <option value="Hindi">→ Hindi</option>
+          <option value="Marathi">→ Marathi</option>
+          <option value="Japanese">→ Japanese</option>
+          <option value="Portuguese">→ Portuguese</option>
+          <option value="Mandarin">→ Mandarin</option>
+        </select>
+      </div>
+    </div>
+    <div class="send-bottom">
+      <input id="msg-input" type="text" placeholder="Type a message…" disabled/>
+      <button id="btn-send" disabled>➤</button>
+    </div>
+  </div>
+
+  <!-- Debug Log (collapsed by default) -->
+  <details>
+    <summary>🔧 WebSocket debug log</summary>
+    <div id="log"></div>
+  </details>
+
+</div>
+
+<script>
+  // ── State ────────────────────────────────────────────────────────────────
+  let stompClient = null;
+  let myUserId    = null;
+  let myName      = "Me";
+  let myLang      = "English";
+
+  // ── DOM refs ─────────────────────────────────────────────────────────────
+  const btnConnect  = document.getElementById('btn-connect');
+  const btnSend     = document.getElementById('btn-send');
+  const msgInput    = document.getElementById('msg-input');
+  const messagesDiv = document.getElementById('messages');
+  const statusDot   = document.getElementById('status-dot');
+  const avatar      = document.getElementById('avatar');
+  const headerName  = document.getElementById('header-name');
+  const headerSub   = document.getElementById('header-sub');
+  const logDiv      = document.getElementById('log');
+
+  // ── Logging helper ───────────────────────────────────────────────────────
+  function addLog(msg, type = 'info') {
+    const line = document.createElement('div');
+    line.className = 'log-' + type;
+    line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    logDiv.appendChild(line);
+    logDiv.scrollTop = logDiv.scrollHeight;
+  }
+
+  // ── Connect ──────────────────────────────────────────────────────────────
+  btnConnect.addEventListener('click', () => {
+    const userId = document.getElementById('my-user-id').value.trim();
+    const name   = document.getElementById('my-name').value.trim() || 'User ' + userId;
+    const lang   = document.getElementById('my-lang').value;
+
+    if (!userId) {
+      alert('Please enter your User ID before connecting.');
+      return;
+    }
+
+    myUserId = userId;
+    myName   = name;
+    myLang   = lang;
+
+    addLog(`Connecting as User ${userId} (${name}, ${lang})…`);
+    btnConnect.disabled = true;
+    btnConnect.textContent = 'Connecting…';
+
+    /*
+     * Auto-detect the server URL from the page's own origin.
+     *
+     * When your friend opens http://10.20.217.208:8080/chat-test.html,
+     * window.location.origin = "http://10.20.217.208:8080"
+     * → SockJS connects to "http://10.20.217.208:8080/ws"  ✅
+     *
+     * When YOU open it locally,
+     * window.location.origin = "http://localhost:8080"
+     * → SockJS connects to "http://localhost:8080/ws"  ✅
+     *
+     * No hardcoded IP needed — it always points at the server that served this page.
+     */
+    const serverUrl = window.location.origin + '/ws';
+    addLog(`Connecting to WebSocket at: ${serverUrl}`);
+    const socket = new SockJS(serverUrl);
+
+    /*
+     * StompJs.Client wraps the SockJS connection and speaks STOMP protocol.
+     * onConnect fires once the WebSocket handshake + STOMP CONNECT frame succeed.
+     */
+    stompClient = new StompJs.Client({
+      webSocketFactory: () => socket,
+      reconnectDelay: 5000,   // auto-reconnect after 5s if connection drops
+
+      onConnect: () => {
+        addLog(`✅ Connected! Subscribed to /topic/user.${myUserId}`, 'info');
+
+        /*
+         * Subscribe to our personal topic.
+         * This matches what ChatWebSocketController.java pushes to:
+         *   messagingTemplate.convertAndSend("/topic/user." + userId, message)
+         *
+         * Every message delivered here is a JSON-serialized MessageResponseDto.
+         */
+        stompClient.subscribe(`/topic/user.${myUserId}`, (frame) => {
+          addLog(`📨 Message received on /topic/user.${myUserId}`, 'recv');
+          const data = JSON.parse(frame.body);
+          renderMessage(data);
+        });
+
+        // Update UI to connected state
+        statusDot.classList.add('connected');
+        avatar.textContent      = name[0].toUpperCase();
+        headerName.textContent  = `${name} (ID: ${userId})`;
+        headerSub.textContent   = `Connected · ${lang}`;
+        btnConnect.textContent  = 'Connected ✓';
+        msgInput.disabled       = false;
+        btnSend.disabled        = false;
+        addSystemMessage(`You joined as ${name} 👋`);
+      },
+
+      onDisconnect: () => {
+        addLog('🔴 Disconnected', 'error');
+        statusDot.classList.remove('connected');
+        headerSub.textContent  = 'Disconnected';
+        btnConnect.disabled    = false;
+        btnConnect.textContent = 'Reconnect';
+        msgInput.disabled      = true;
+        btnSend.disabled       = true;
+      },
+
+      onStompError: (frame) => {
+        addLog(`STOMP error: ${frame.headers?.message}`, 'error');
+      }
+    });
+
+    stompClient.activate();  // kicks off the WebSocket connection
+  });
+
+  // ── Send message ─────────────────────────────────────────────────────────
+  function sendMessage() {
+    const text       = msgInput.value.trim();
+    const toUserId   = document.getElementById('to-user-id').value.trim();
+    const targetLang = document.getElementById('to-lang').value;
+
+    if (!text)     { alert('Type a message first!'); return; }
+    if (!toUserId) { alert('Enter the receiver\'s User ID!'); return; }
+    if (!stompClient?.connected) { alert('Not connected!'); return; }
+
+    /*
+     * Build the payload — this maps exactly to SendMessageRequestDto.java
+     * Fields: senderId, receiverId, originalText, originalLanguage, targetLanguage
+     * (translatedText is gone — the server handles that now via OpenAI)
+     */
+    const payload = {
+      senderId:         parseInt(myUserId),
+      receiverId:       parseInt(toUserId),
+      originalText:     text,
+      originalLanguage: myLang,
+      targetLanguage:   targetLang
+    };
+
+    addLog(`📤 Sending to /app/chat.send → ${JSON.stringify(payload)}`);
+
+    /*
+     * stompClient.publish() sends a STOMP MESSAGE frame to the server.
+     * destination must match @MessageMapping("/chat.send") in ChatWebSocketController.java
+     * ("/app" prefix is stripped by the broker config)
+     */
+    stompClient.publish({
+      destination: '/app/chat.send',
+      body: JSON.stringify(payload)
+    });
+
+    msgInput.value = '';
+    msgInput.focus();
+  }
+
+  btnSend.addEventListener('click', sendMessage);
+  msgInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  // ── Render a received MessageResponseDto ─────────────────────────────────
+  function renderMessage(data) {
+    /*
+     * data shape (MessageResponseDto.java):
+     *   id, senderId, receiverId, originalText, translatedText,
+     *   originalLanguage, targetLanguage, timestamp
+     */
+    const isSent      = String(data.senderId) === String(myUserId);
+    const wrapper     = document.createElement('div');
+    wrapper.className = 'bubble-wrapper ' + (isSent ? 'sent' : 'recv');
+
+    const bubble      = document.createElement('div');
+    bubble.className  = 'bubble ' + (isSent ? 'sent' : 'recv');
+
+    // Main text: show translated text (what the receiver sees in their language)
+    const mainText    = document.createElement('div');
+    mainText.textContent = isSent
+      ? data.originalText                 // sender sees what they typed
+      : data.translatedText;              // receiver sees the translated version
+
+    // Secondary text: show the original so you can compare
+    const subText     = document.createElement('div');
+    subText.className = 'original';
+    subText.textContent = isSent
+      ? `→ ${data.targetLanguage}: ${data.translatedText}`   // sender: "what they got"
+      : `Original (${data.originalLanguage}): ${data.originalText}`;  // receiver: "what was said"
+
+    const meta        = document.createElement('div');
+    meta.className    = 'meta';
+    const ts          = data.timestamp ? new Date(data.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+    meta.textContent  = (isSent ? 'You' : `User ${data.senderId}`) + (ts ? ` · ${ts}` : '');
+
+    bubble.appendChild(mainText);
+    bubble.appendChild(subText);
+    bubble.appendChild(meta);
+    wrapper.appendChild(bubble);
+    messagesDiv.appendChild(wrapper);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+    // Remove the "connect above" placeholder on first message
+    const placeholder = messagesDiv.querySelector('.system-msg');
+    if (placeholder) placeholder.remove();
+  }
+
+  // ── System message (connection events etc.) ───────────────────────────────
+  function addSystemMessage(text) {
+    const el = document.createElement('div');
+    el.className  = 'system-msg';
+    el.textContent = text;
+    messagesDiv.appendChild(el);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    const placeholder = messagesDiv.querySelector('.system-msg:first-child');
+    if (placeholder && placeholder !== el) placeholder.remove();
+  }
+</script>
+</body>
+</html>
