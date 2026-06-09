@@ -13,6 +13,13 @@
   <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@6/bundles/stomp.umd.min.js"></script>
 
+  <!--
+    Google Identity Services SDK — provides the Sign-In button and One Tap prompt.
+    callback="handleGoogleCredential" is invoked by Google with the ID token after
+    the user approves. We then send that token to POST /auth/google on our server.
+  -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
   <style>
     /* ── Reset & base ───────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -182,6 +189,27 @@
     #btn-send:hover    { background: #128c7e; }
     #btn-send:disabled { background: #aaa; cursor: not-allowed; }
 
+    /* ── Google Sign-In button ──────────────────────────── */
+    .divider {
+      display: flex; align-items: center; gap: 10px;
+      margin: 10px 0; color: #999; font-size: 12px;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1; height: 1px; background: #e9edef;
+    }
+    .btn-google {
+      width: 100%; padding: 9px;
+      background: #fff; color: #3c4043;
+      border: 1px solid #d1d7db;
+      border-radius: 8px; font-size: 14px; font-weight: 500;
+      cursor: pointer; display: flex; align-items: center;
+      justify-content: center; gap: 10px;
+      transition: background .2s, box-shadow .2s;
+      margin-top: 4px;
+    }
+    .btn-google:hover { background: #f8f9fa; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+    .btn-google svg   { width: 18px; height: 18px; flex-shrink: 0; }
+
     /* ── Log panel ──────────────────────────────────────── */
     details { border-top: 1px solid #e9edef; background: #fafafa; }
     summary { padding: 8px 14px; font-size: 11px; color: #667781; cursor: pointer; user-select: none; }
@@ -226,6 +254,34 @@
       </div>
     </div>
     <button class="btn-primary" id="btn-login">Login</button>
+
+    <div class="divider">or</div>
+
+    <!--
+      Google Sign-In button.
+      Clicking this triggers Google's Identity Services popup.
+      On success, Google calls handleGoogleCredential(response) with the ID token.
+
+      data-client_id  — your Google Cloud OAuth2 Client ID (replace the placeholder!)
+      data-callback   — JS function Google calls after the user approves
+      data-auto_select — false: don't auto-sign in silently (good for a test page)
+    -->
+    <div id="g_id_onload"
+         data-client_id="341789138413-lc0evlvskf9mq747k8r5n2a4dle671if.apps.googleusercontent.com"
+         data-callback="handleGoogleCredential"
+         data-auto_select="false">
+    </div>
+    <button class="btn-google" id="btn-google-login" onclick="triggerGoogleLogin()">
+      <!-- Official Google 'G' logo SVG -->
+      <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+      </svg>
+      Continue with Google
+    </button>
+
     <div class="status-label" id="login-status"></div>
   </div>
 
@@ -329,6 +385,68 @@
     line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
     logDiv.appendChild(line);
     logDiv.scrollTop = logDiv.scrollHeight;
+  }
+
+  // ── Google Sign-In ────────────────────────────────────────────────────────
+  //
+  // triggerGoogleLogin() — manually opens the Google sign-in popup.
+  // Google Identity Services renders its own button via the g_id_onload div,
+  // but we also wire a custom styled button here for consistent UI.
+  //
+  function triggerGoogleLogin() {
+    if (typeof google === 'undefined') {
+      showLoginStatus('Google SDK not loaded. Check your internet connection.', false);
+      return;
+    }
+    google.accounts.id.initialize({
+      client_id: document.getElementById('g_id_onload').dataset.client_id,
+      callback: handleGoogleCredential
+    });
+    google.accounts.id.prompt();
+  }
+
+  // Called by Google SDK after the user approves.
+  // response.credential is the signed Google ID Token (a JWT string).
+  async function handleGoogleCredential(response) {
+    const idToken = response.credential;
+    addLog('Google credential received — sending to /auth/google…');
+
+    const btn = document.getElementById('btn-google-login');
+    btn.disabled = true;
+
+    try {
+      const resp = await fetch('/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken })
+      });
+
+      if (resp.status === 409) {
+        throw new Error('This email is already registered with a password. Please use the email/password login instead.');
+      }
+      if (!resp.ok) {
+        throw new Error(`Google login failed (HTTP ${resp.status})`);
+      }
+
+      const data = await resp.json();
+      accessToken = data.accessToken;
+      myUserId    = data.userId;
+      myName      = data.name || data.email;
+
+      addLog(`✅ Google login OK — ${myName} (userId: ${myUserId})`);
+      showLoginStatus(`Logged in as ${myName} (Google)`, true);
+
+      document.getElementById('display-name').value = `${myName} (ID: ${myUserId})`;
+      document.getElementById('connect-panel').style.display = 'block';
+      document.getElementById('btn-login').textContent = 'Logged in ✓';
+      document.getElementById('btn-login').disabled = true;
+      btn.textContent = '✓ Signed in with Google';
+
+    } catch (err) {
+      addLog(`Google login failed: ${err.message}`, 'error');
+      showLoginStatus(err.message, false);
+      btn.disabled = false;
+    }
   }
 
   // ── STEP 1: Login ─────────────────────────────────────────────────────────

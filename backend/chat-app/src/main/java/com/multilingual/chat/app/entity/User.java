@@ -49,6 +49,14 @@ public class User {
     private String googleId;
 
     /**
+     * Profile picture URL from Google.
+     * NULL for LOCAL users (unless they upload one in a future phase).
+     * Populated from the Google ID token's "picture" claim on OAuth2 login.
+     */
+    @Column(name = "picture_url")
+    private String pictureUrl;
+
+    /**
      * Whether this user's email address has been verified.
      * LOCAL users must verify via email link; Google users are pre-verified.
      */
@@ -143,6 +151,10 @@ public class User {
         return isVerified;
     }
 
+    public String getPictureUrl() {
+        return pictureUrl;
+    }
+
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
     }
@@ -187,5 +199,9 @@ public class User {
 
     public void setVerified(boolean verified) {
         this.isVerified = verified;
+    }
+
+    public void setPictureUrl(String pictureUrl) {
+        this.pictureUrl = pictureUrl;
     }
 }

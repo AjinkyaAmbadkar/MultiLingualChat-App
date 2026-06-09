@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.multilingual.chat.app.dto.AuthResponseDto;
+import com.multilingual.chat.app.dto.GoogleLoginRequestDto;
 import com.multilingual.chat.app.dto.LoginRequestDto;
 import com.multilingual.chat.app.dto.RefreshTokenRequestDto;
 import com.multilingual.chat.app.dto.RegisterRequestDto;
@@ -57,6 +58,32 @@ public class AuthController {
         log.info("POST /auth/login | email: {}", request.getEmail());
         AuthResponseDto response = authService.login(request);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Google OAuth2 login — frontend-initiated flow.
+     *
+     * The frontend obtains a Google ID Token via Google Identity Services (JS SDK)
+     * and sends it here. We verify it with Google, find-or-create the user,
+     * and return our standard JWT pair — same response shape as /auth/login.
+     *
+     * Returns 200 OK on success (login or first-time signup via Google).
+     * Returns 409 CONFLICT if the email is already registered as a LOCAL account.
+     */
+    @PostMapping("/google")
+    public ResponseEntity<AuthResponseDto> googleLogin(@Valid @RequestBody GoogleLoginRequestDto request) {
+        log.info("POST /auth/google");
+        try {
+            AuthResponseDto response = authService.loginWithGoogle(request.getIdToken());
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            // Surface the conflict clearly so the frontend can show the right message
+            if (e.getMessage() != null && e.getMessage().contains("already registered with a password")) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).build();
+            }
+            log.warn("Google login failed: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
     }
 
     /**
