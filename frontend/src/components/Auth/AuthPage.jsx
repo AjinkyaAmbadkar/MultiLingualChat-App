@@ -3,62 +3,129 @@ import { useAuth } from '../../context/AuthContext'
 import { login, register, googleLogin } from '../../api/auth'
 import { getMe } from '../../api/users'
 
-const LANGUAGES = [
-  'English','Spanish','French','German','Hindi',
-  'Marathi','Japanese','Portuguese','Mandarin',
-]
-
+const LANGUAGES = ['English','Spanish','French','German','Hindi','Marathi','Japanese','Portuguese','Mandarin']
 const GOOGLE_CLIENT_ID = '341789138413-lc0evlvskf9mq747k8r5n2a4dle671if.apps.googleusercontent.com'
+
+const S = {
+  page: {
+    minHeight: '100vh', display: 'flex',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    background: '#0f172a',
+  },
+  left: {
+    flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center',
+    padding: '60px 64px',
+    background: 'linear-gradient(160deg, #0f172a 0%, #1e3a5f 60%, #1e40af 100%)',
+  },
+  right: {
+    width: '480px', flexShrink: 0, background: '#fff',
+    display: 'flex', flexDirection: 'column', justifyContent: 'center',
+    padding: '48px 48px',
+    minHeight: '100vh',
+  },
+  logo: {
+    display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '48px',
+  },
+  logoIcon: {
+    width: '48px', height: '48px', borderRadius: '14px',
+    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: '24px',
+  },
+  logoText: { fontSize: '20px', fontWeight: 700, color: '#fff', letterSpacing: '-0.3px' },
+  tagline: {
+    fontSize: '48px', fontWeight: 800, color: '#fff',
+    lineHeight: 1.1, letterSpacing: '-1px', marginBottom: '24px',
+  },
+  taglineAccent: { color: '#60a5fa' },
+  sub: { fontSize: '16px', color: '#94a3b8', lineHeight: 1.7, maxWidth: '420px' },
+  features: { marginTop: '48px', display: 'flex', flexDirection: 'column', gap: '16px' },
+  feature: { display: 'flex', alignItems: 'center', gap: '14px' },
+  featureIcon: {
+    width: '36px', height: '36px', borderRadius: '10px',
+    background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0,
+  },
+  featureText: { fontSize: '14px', color: '#cbd5e1' },
+
+  formTitle: { fontSize: '26px', fontWeight: 800, color: '#0f172a', marginBottom: '6px', letterSpacing: '-0.5px' },
+  formSub: { fontSize: '14px', color: '#64748b', marginBottom: '28px' },
+  tabs: { display: 'flex', background: '#f1f5f9', borderRadius: '10px', padding: '3px', marginBottom: '24px' },
+  tab: (active) => ({
+    flex: 1, padding: '9px', border: 'none', borderRadius: '8px', cursor: 'pointer',
+    fontSize: '14px', fontWeight: 600, transition: 'all .2s',
+    background: active ? '#fff' : 'transparent',
+    color: active ? '#1e40af' : '#64748b',
+    boxShadow: active ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+  }),
+  label: { display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' },
+  input: (focused) => ({
+    width: '100%', padding: '11px 14px', border: `1.5px solid ${focused ? '#3b82f6' : '#e2e8f0'}`,
+    borderRadius: '10px', fontSize: '14px', color: '#0f172a', background: '#f8fafc',
+    outline: 'none', boxSizing: 'border-box', transition: 'all .2s',
+    boxShadow: focused ? '0 0 0 3px rgba(59,130,246,0.12)' : 'none',
+  }),
+  field: { marginBottom: '16px' },
+  btn: {
+    width: '100%', padding: '13px', background: '#1d4ed8', color: '#fff',
+    border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700,
+    cursor: 'pointer', marginTop: '4px', letterSpacing: '0.1px',
+    boxShadow: '0 4px 14px rgba(29,78,216,0.35)',
+  },
+  divider: { display: 'flex', alignItems: 'center', gap: '12px', margin: '20px 0' },
+  divLine: { flex: 1, height: '1px', background: '#e2e8f0' },
+  divText: { fontSize: '12px', color: '#94a3b8', whiteSpace: 'nowrap' },
+  googleBtn: {
+    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    gap: '10px', padding: '12px', border: '1.5px solid #e2e8f0', borderRadius: '12px',
+    background: '#fff', fontSize: '14px', fontWeight: 600, color: '#374151', cursor: 'pointer',
+  },
+  error: {
+    background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626',
+    borderRadius: '10px', padding: '11px 14px', fontSize: '13px', marginBottom: '20px', lineHeight: 1.5,
+  },
+}
 
 export default function AuthPage() {
   const { signIn } = useAuth()
   const [tab, setTab]         = useState('login')
   const [error, setError]     = useState('')
   const [loading, setLoading] = useState(false)
-
   const [loginEmail, setLoginEmail]       = useState('')
   const [loginPassword, setLoginPassword] = useState('')
-  const [regName, setRegName]             = useState('')
-  const [regEmail, setRegEmail]           = useState('')
-  const [regPass, setRegPass]             = useState('')
-  const [regLang, setRegLang]             = useState('English')
+  const [regName, setRegName]   = useState('')
+  const [regEmail, setRegEmail] = useState('')
+  const [regPass, setRegPass]   = useState('')
+  const [regLang, setRegLang]   = useState('English')
 
   useEffect(() => {
-    const script = document.createElement('script')
-    script.src = 'https://accounts.google.com/gsi/client'
-    script.async = true
-    document.body.appendChild(script)
-    return () => document.body.removeChild(script)
+    const s = document.createElement('script')
+    s.src = 'https://accounts.google.com/gsi/client'; s.async = true
+    document.body.appendChild(s)
+    return () => document.body.removeChild(s)
   }, [])
 
-  async function handleSignIn(authResponse) {
-    const me = await getMe(authResponse.accessToken)
-    signIn(authResponse.accessToken, {
-      id: me.id, name: me.name, email: me.email,
-      pictureUrl: me.pictureUrl, preferredLanguage: me.preferredLanguage
-    })
+  async function handleSignIn(res) {
+    const me = await getMe(res.accessToken)
+    signIn(res.accessToken, { id: me.id, name: me.name, email: me.email, pictureUrl: me.pictureUrl, preferredLanguage: me.preferredLanguage })
   }
 
   async function handleLogin(e) {
-    e.preventDefault()
-    setError(''); setLoading(true)
-    try {
-      await handleSignIn(await login(loginEmail, loginPassword))
-    } catch (err) { setError(err.message) }
+    e.preventDefault(); setError(''); setLoading(true)
+    try { await handleSignIn(await login(loginEmail, loginPassword)) }
+    catch (err) { setError(err.message) }
     finally { setLoading(false) }
   }
 
   async function handleRegister(e) {
-    e.preventDefault()
-    setError(''); setLoading(true)
-    try {
-      await handleSignIn(await register(regName, regEmail, regPass, regLang))
-    } catch (err) { setError(err.message) }
+    e.preventDefault(); setError(''); setLoading(true)
+    try { await handleSignIn(await register(regName, regEmail, regPass, regLang)) }
+    catch (err) { setError(err.message) }
     finally { setLoading(false) }
   }
 
   function triggerGoogle() {
-    if (typeof google === 'undefined') { setError('Google SDK not loaded yet, try again in a moment.'); return }
+    if (typeof google === 'undefined') { setError('Google SDK not loaded, try again in a moment.'); return }
     google.accounts.id.initialize({
       client_id: GOOGLE_CLIENT_ID,
       callback: async (response) => {
@@ -72,158 +139,109 @@ export default function AuthPage() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #1e3a5f 0%, #2d6a9f 50%, #1a2f4e 100%)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '24px',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    }}>
-      <div style={{
-        background: '#ffffff',
-        borderRadius: '20px',
-        boxShadow: '0 25px 60px rgba(0,0,0,0.35)',
-        width: '100%',
-        maxWidth: '440px',
-        overflow: 'visible',
-      }}>
-
-        {/* Header */}
-        <div style={{
-          background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
-          borderRadius: '20px 20px 0 0',
-          padding: '28px 32px 24px',
-          color: '#fff',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-            <span style={{ fontSize: '24px' }}>💬</span>
-            <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 700, letterSpacing: '-0.3px' }}>
-              MultiLingual Chat
-            </h1>
-          </div>
-          <p style={{ margin: 0, fontSize: '13px', opacity: 0.85 }}>
-            Talk to anyone, in any language
-          </p>
+    <div style={S.page}>
+      {/* Left — branding */}
+      <div style={S.left}>
+        <div style={S.logo}>
+          <div style={S.logoIcon}>💬</div>
+          <span style={S.logoText}>MultiLingual Chat</span>
         </div>
 
-        {/* Tab switcher */}
-        <div style={{ display: 'flex', borderBottom: '2px solid #f1f5f9' }}>
+        <h1 style={S.tagline}>
+          Chat without<br />
+          <span style={S.taglineAccent}>Hassle or</span><br />
+          Language Barrier
+        </h1>
+
+        <p style={S.sub}>
+          Type in your language. Your friends read in theirs.
+          Powered by OpenAI — translation happens automatically, invisibly.
+        </p>
+
+        <div style={S.features}>
+          {[
+            { icon: '🌍', text: 'Supports English, Spanish, Hindi, Japanese, French & more' },
+            { icon: '⚡', text: 'Real-time delivery over WebSocket — zero delay' },
+            { icon: '🔒', text: 'Secured with JWT + Google OAuth2 — your data is yours' },
+            { icon: '💰', text: 'Translation called only when languages differ — cost efficient' },
+          ].map(f => (
+            <div key={f.icon} style={S.feature}>
+              <div style={S.featureIcon}>{f.icon}</div>
+              <span style={S.featureText}>{f.text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Right — form */}
+      <div style={S.right}>
+        <div style={S.formTitle}>Welcome back</div>
+        <div style={S.formSub}>Sign in to your account or create a new one</div>
+
+        {/* Tabs */}
+        <div style={S.tabs}>
           {['login','register'].map(t => (
-            <button key={t} onClick={() => { setTab(t); setError('') }} style={{
-              flex: 1, padding: '14px', border: 'none', background: 'transparent',
-              fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'all .2s',
-              color: tab === t ? '#2563eb' : '#94a3b8',
-              borderBottom: tab === t ? '2px solid #2563eb' : '2px solid transparent',
-              marginBottom: '-2px',
-            }}>
+            <button key={t} onClick={() => { setTab(t); setError('') }} style={S.tab(tab === t)}>
               {t === 'login' ? 'Sign In' : 'Create Account'}
             </button>
           ))}
         </div>
 
-        {/* Form body */}
-        <div style={{ padding: '28px 32px 32px' }}>
+        {error && <div style={S.error}>{error}</div>}
 
-          {error && (
-            <div style={{
-              background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626',
-              borderRadius: '10px', padding: '12px 16px', fontSize: '13px',
-              marginBottom: '20px', lineHeight: 1.5,
-            }}>
-              {error}
+        {tab === 'login' ? (
+          <form onSubmit={handleLogin}>
+            <Field label="Email" type="email" value={loginEmail} onChange={setLoginEmail} placeholder="you@example.com" />
+            <Field label="Password" type="password" value={loginPassword} onChange={setLoginPassword} placeholder="Enter your password" />
+            <button type="submit" disabled={loading} style={{ ...S.btn, opacity: loading ? 0.7 : 1 }}>
+              {loading ? 'Signing in…' : 'Sign In →'}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleRegister}>
+            <Field label="Full Name" value={regName} onChange={setRegName} placeholder="Your name" />
+            <Field label="Email" type="email" value={regEmail} onChange={setRegEmail} placeholder="you@example.com" />
+            <Field label="Password" type="password" value={regPass} onChange={setRegPass} placeholder="At least 8 characters" />
+            <div style={S.field}>
+              <label style={S.label}>Preferred Language</label>
+              <select value={regLang} onChange={e => setRegLang(e.target.value)} style={S.input(false)}>
+                {LANGUAGES.map(l => <option key={l}>{l}</option>)}
+              </select>
             </div>
-          )}
+            <button type="submit" disabled={loading} style={{ ...S.btn, opacity: loading ? 0.7 : 1 }}>
+              {loading ? 'Creating account…' : 'Create Account →'}
+            </button>
+          </form>
+        )}
 
-          {tab === 'login' ? (
-            <form onSubmit={handleLogin}>
-              <Field label="Email" type="email" value={loginEmail} onChange={setLoginEmail} placeholder="you@example.com" />
-              <Field label="Password" type="password" value={loginPassword} onChange={setLoginPassword} placeholder="Enter your password" />
-              <SubmitBtn loading={loading}>Sign In</SubmitBtn>
-            </form>
-          ) : (
-            <form onSubmit={handleRegister}>
-              <Field label="Full Name" value={regName} onChange={setRegName} placeholder="Your name" />
-              <Field label="Email" type="email" value={regEmail} onChange={setRegEmail} placeholder="you@example.com" />
-              <Field label="Password" type="password" value={regPass} onChange={setRegPass} placeholder="At least 8 characters" />
-              <div style={{ marginBottom: '16px' }}>
-                <label style={labelStyle}>Preferred Language</label>
-                <select value={regLang} onChange={e => setRegLang(e.target.value)} style={inputStyle}>
-                  {LANGUAGES.map(l => <option key={l}>{l}</option>)}
-                </select>
-              </div>
-              <SubmitBtn loading={loading}>Create Account</SubmitBtn>
-            </form>
-          )}
+        <div style={S.divider}>
+          <div style={S.divLine} />
+          <span style={S.divText}>or continue with</span>
+          <div style={S.divLine} />
+        </div>
 
-          {/* Divider */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '20px 0', color: '#cbd5e1', fontSize: '12px' }}>
-            <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
-            <span style={{ color: '#94a3b8' }}>or continue with</span>
-            <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
-          </div>
-
-          {/* Google button */}
-          <button onClick={triggerGoogle} disabled={loading} style={{
-            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            gap: '10px', padding: '12px', border: '1.5px solid #e2e8f0', borderRadius: '12px',
-            background: '#fff', fontSize: '14px', fontWeight: 500, color: '#374151',
-            cursor: 'pointer', transition: 'all .2s',
-          }}
+        <button onClick={triggerGoogle} disabled={loading} style={S.googleBtn}
           onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
           onMouseLeave={e => e.currentTarget.style.background = '#fff'}
-          >
-            <GoogleIcon />
-            Continue with Google
-          </button>
-
-        </div>
+        >
+          <GoogleIcon /> Continue with Google
+        </button>
       </div>
     </div>
   )
 }
 
-const labelStyle = {
-  display: 'block', fontSize: '13px', fontWeight: 600,
-  color: '#374151', marginBottom: '6px',
-}
-
-const inputStyle = {
-  width: '100%', padding: '11px 14px', border: '1.5px solid #e2e8f0',
-  borderRadius: '10px', fontSize: '14px', color: '#1e293b',
-  background: '#f8fafc', outline: 'none', boxSizing: 'border-box',
-  transition: 'border-color .2s',
-}
-
 function Field({ label, type = 'text', value, onChange, placeholder }) {
   const [focused, setFocused] = useState(false)
   return (
-    <div style={{ marginBottom: '16px' }}>
-      <label style={labelStyle}>{label}</label>
-      <input
-        type={type} value={value} placeholder={placeholder} required
+    <div style={S.field}>
+      <label style={S.label}>{label}</label>
+      <input type={type} value={value} placeholder={placeholder} required
         onChange={e => onChange(e.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        style={{ ...inputStyle, borderColor: focused ? '#2563eb' : '#e2e8f0',
-          boxShadow: focused ? '0 0 0 3px rgba(37,99,235,0.1)' : 'none' }}
+        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+        style={S.input(focused)}
       />
     </div>
-  )
-}
-
-function SubmitBtn({ children, loading }) {
-  return (
-    <button type="submit" disabled={loading} style={{
-      width: '100%', padding: '13px', background: loading ? '#93c5fd' : '#2563eb',
-      color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px',
-      fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer',
-      marginTop: '4px', marginBottom: '4px', transition: 'background .2s',
-      letterSpacing: '0.1px',
-    }}>
-      {loading ? 'Please wait…' : children}
-    </button>
   )
 }
 

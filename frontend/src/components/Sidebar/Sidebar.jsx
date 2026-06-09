@@ -29,65 +29,86 @@ export default function Sidebar() {
 
   return (
     <aside style={{
-      width: '300px', flexShrink: 0, background: '#fff',
-      borderRight: '1px solid #e2e8f0',
+      width: '300px', flexShrink: 0,
+      background: '#0f172a',
       display: 'flex', flexDirection: 'column', height: '100vh',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
     }}>
-      {/* Profile bar */}
+
+      {/* App branding bar */}
       <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '16px', borderBottom: '1px solid #f1f5f9',
-        background: '#fff',
+        padding: '20px 16px 16px',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Avatar name={auth.user.name} pictureUrl={auth.user.pictureUrl} size="sm" />
-          <div>
-            <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#1e293b' }}>
-              {auth.user.name}
-            </p>
-            <p style={{ margin: 0, fontSize: '11px', color: '#94a3b8' }}>
-              {auth.user.preferredLanguage}
-            </p>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+          <div style={{
+            width: '32px', height: '32px', borderRadius: '9px',
+            background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px',
+          }}>💬</div>
+          <span style={{ fontSize: '15px', fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.2px' }}>
+            MultiLingual Chat
+          </span>
         </div>
-        <button onClick={signOut} title="Sign out" style={{
-          background: 'none', border: 'none', cursor: 'pointer',
-          fontSize: '18px', color: '#94a3b8', padding: '4px',
-          borderRadius: '6px', lineHeight: 1,
-        }}
-        onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
-        onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
-        >
-          ⏻
-        </button>
+
+        {/* Profile row */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Avatar name={auth.user.name} pictureUrl={auth.user.pictureUrl} size="sm" />
+            <div>
+              <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>
+                {auth.user.name}
+              </p>
+              <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>
+                {auth.user.preferredLanguage}
+              </p>
+            </div>
+          </div>
+          <button onClick={signOut} title="Sign out" style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: '16px', color: '#475569', padding: '4px', borderRadius: '6px', lineHeight: 1,
+          }}
+          onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+          onMouseLeave={e => e.currentTarget.style.color = '#475569'}
+          >
+            ⏻
+          </button>
+        </div>
       </div>
 
       {/* New Chat button */}
-      <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9' }}>
+      <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <button onClick={() => setShowModal(true)} style={{
-          width: '100%', padding: '10px', background: '#2563eb',
+          width: '100%', padding: '10px', background: '#1d4ed8',
           color: '#fff', border: 'none', borderRadius: '10px',
-          fontSize: '14px', fontWeight: 600, cursor: 'pointer',
-          transition: 'background .2s',
+          fontSize: '13px', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.1px',
+          transition: 'background .2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
         }}
-        onMouseEnter={e => e.currentTarget.style.background = '#1d4ed8'}
-        onMouseLeave={e => e.currentTarget.style.background = '#2563eb'}
+        onMouseEnter={e => e.currentTarget.style.background = '#2563eb'}
+        onMouseLeave={e => e.currentTarget.style.background = '#1d4ed8'}
         >
-          + New Chat
+          <span style={{ fontSize: '16px', lineHeight: 1 }}>+</span> New Chat
         </button>
       </div>
 
-      {/* Conversations */}
+      {/* Section label */}
+      <div style={{ padding: '14px 16px 6px' }}>
+        <span style={{ fontSize: '10px', fontWeight: 700, color: '#475569', letterSpacing: '1px', textTransform: 'uppercase' }}>
+          Messages
+        </span>
+      </div>
+
+      {/* Conversation list */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {conversations.length === 0 ? (
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'center', height: '100%', color: '#94a3b8',
-            padding: '32px 24px', textAlign: 'center', gap: '10px',
+            justifyContent: 'center', height: '60%', color: '#475569',
+            padding: '32px 20px', textAlign: 'center', gap: '10px',
           }}>
-            <span style={{ fontSize: '40px' }}>💬</span>
-            <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.5 }}>
-              No conversations yet.<br />Click <strong>+ New Chat</strong> to start one.
+            <span style={{ fontSize: '36px' }}>💬</span>
+            <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.6, color: '#64748b' }}>
+              No conversations yet.<br />Click <strong style={{ color: '#93c5fd' }}>+ New Chat</strong> to start one.
             </p>
           </div>
         ) : conversations.map(c => (
