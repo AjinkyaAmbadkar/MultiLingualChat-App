@@ -83,6 +83,51 @@
     		<groupId>org.springframework.boot</groupId>
     		<artifactId>spring-boot-starter-validation</artifactId>
 		</dependency>
+
+		<!--
+		  ⚠️  IMPORTANT — Spring Security locks down ALL endpoints by default.
+		  Once this dependency is on the classpath, every HTTP request requires
+		  authentication (Spring returns 401 / redirect to /login).
+		  The existing REST APIs and WebSocket endpoint will stop working until
+		  SecurityConfig.java is created in Phase 2 to open them up selectively.
+		  Do NOT start the app between Phase 1 and Phase 2 expecting the old
+		  behaviour — configure security first.
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+
+		<!-- Google OAuth2 login support (Social login via Google) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-oauth2-client</artifactId>
+		</dependency>
+
+		<!--
+		  JJWT — Java JWT library for creating and validating JSON Web Tokens.
+		  Split into three jars:
+		    jjwt-api     : the public API you code against (compile scope)
+		    jjwt-impl    : the implementation — runtime only (never reference it directly)
+		    jjwt-jackson : Jackson-based JSON parser for JWT — runtime only
+		-->
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-api</artifactId>
+			<version>0.12.3</version>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-impl</artifactId>
+			<version>0.12.3</version>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-jackson</artifactId>
+			<version>0.12.3</version>
+			<scope>runtime</scope>
+		</dependency>
 	</dependencies>
 
 	<build>

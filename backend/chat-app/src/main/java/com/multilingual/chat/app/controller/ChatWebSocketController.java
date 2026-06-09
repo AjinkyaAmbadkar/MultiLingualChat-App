@@ -1,5 +1,7 @@
 package com.multilingual.chat.app.controller;
 
+import java.security.Principal;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -16,6 +18,10 @@ import com.multilingual.chat.app.service.MessageService;
  *
  * Note: this is @Controller, NOT @RestController — WebSocket handlers
  * don't return HTTP responses; they push messages via SimpMessagingTemplate.
+ *
+ * Phase 6 change: sendMessage() now takes a Principal parameter.
+ * Spring injects the Principal that JwtChannelInterceptor set during the STOMP CONNECT.
+ * We extract the sender's email from it — no more client-supplied senderId in the payload.
  */
 @Controller
 public class ChatWebSocketController {
@@ -45,24 +51,31 @@ public class ChatWebSocketController {
      *   - ("/app" prefix is stripped by the broker config, leaving "/chat.send")
      *   - Spring routes it to this method
      *
-     * @Payload binds the incoming JSON body to SendMessageRequestDto
-     * (same DTO as the REST endpoint — no duplication needed!)
+     * @Payload  — binds the incoming JSON body to SendMessageRequestDto
+     * Principal — injected by Spring from the STOMP session. It was set by
+     *             JwtChannelInterceptor.preSend() when the client sent CONNECT.
+     *             principal.getName() returns the email (the JWT "subject" claim).
      *
      * Flow:
-     *   1. Receive message from sender
-     *   2. Translate + save via MessageService (existing logic, unchanged)
-     *   3. Push MessageResponseDto to receiver's topic → they see translated message
-     *   4. Push MessageResponseDto back to sender's topic → they see their message confirmed/saved
+     *   1. Extract sender's email from Principal (JWT) — NOT from the client payload
+     *   2. Pass to MessageService which looks up the User by email
+     *   3. Translate + save via MessageService (sender/receiver lookup, OpenAI, DB save)
+     *   4. Push MessageResponseDto to receiver's topic → they see translated message
+     *   5. Echo back to sender's topic → they get the server-assigned ID + timestamp
      */
     @MessageMapping("/chat.send")
-    public void sendMessage(@Payload SendMessageRequestDto requestDto) {
+    public void sendMessage(@Payload SendMessageRequestDto requestDto, Principal principal) {
 
-        log.info("[WS] Message received | senderId: {} → receiverId: {}",
-                requestDto.getSenderId(), requestDto.getReceiverId());
+        // principal.getName() → AbstractAuthenticationToken.getName() → UserDetails.getUsername()
+        // = the email, because JwtChannelInterceptor wrapped UserDetails in the Authentication
+        String senderEmail = principal.getName();
 
-        // Reuse the exact same service that the REST endpoint uses.
-        // This means: sender/receiver lookup, translation via OpenAI, save to DB.
-        MessageResponseDto savedMessage = messageService.sendMessage(requestDto);
+        log.info("[WS] Message received | sender: {} → receiverId: {}",
+                senderEmail, requestDto.getReceiverId());
+
+        // The service now receives the senderEmail from the JWT — not from the DTO.
+        // It looks up the User by email, so the sender cannot be forged.
+        MessageResponseDto savedMessage = messageService.sendMessage(requestDto, senderEmail);
 
         // Push the translated message to the RECEIVER.
         // They're subscribed to "/topic/user.{theirId}" and will receive it instantly.

@@ -4,7 +4,7 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,7 +22,7 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/api/messages")
 public class MessageController {
-    private static final Logger log = LoggerFactory.getLogger(MessageService.class);
+    private static final Logger log = LoggerFactory.getLogger(MessageController.class);
 
     private final MessageService messageService;
 
@@ -30,11 +30,22 @@ public class MessageController {
         this.messageService = messageService;
     }
 
+    /**
+     * REST endpoint for sending a message.
+     *
+     * Phase 6 change: senderId is no longer read from the request body.
+     * The Authentication object is populated by JwtAuthFilter (runs on every HTTP request).
+     * authentication.getName() returns the email from the JWT subject claim.
+     *
+     * This mirrors the WebSocket path — the server always derives who the sender is
+     * from the authenticated Principal, never from the client payload.
+     */
     @PostMapping("/send")
-    public MessageResponseDto sendMessage(@Valid @RequestBody SendMessageRequestDto requestDto) {
-        log.debug("Message body at controller {}", requestDto);
-        return messageService.sendMessage(requestDto);
-
+    public MessageResponseDto sendMessage(@Valid @RequestBody SendMessageRequestDto requestDto,
+                                          Authentication authentication) {
+        String senderEmail = authentication.getName();
+        log.debug("REST /send | sender: {} | receiverId: {}", senderEmail, requestDto.getReceiverId());
+        return messageService.sendMessage(requestDto, senderEmail);
     }
 
     @GetMapping("/history")

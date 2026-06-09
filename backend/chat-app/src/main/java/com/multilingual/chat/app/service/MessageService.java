@@ -13,8 +13,6 @@ import com.multilingual.chat.app.entity.Message;
 import com.multilingual.chat.app.entity.User;
 import com.multilingual.chat.app.repository.MessageRepository;
 import com.multilingual.chat.app.repository.UserRepository;
-import com.multilingual.chat.app.service.TranslationService;
-
 @Service
 public class MessageService {
 
@@ -25,8 +23,7 @@ public class MessageService {
     private final TranslationService translationService;
 
     // Constructor injection — Spring automatically wires all three dependencies.
-    // Since OpenAiTranslationServiceImpl is @Primary, that's what gets injected
-    // here.
+    // Since OpenAiTranslationServiceImpl is @Primary, that's what gets injected here.
     public MessageService(MessageRepository messageRepository,
             UserRepository userRepository,
             TranslationService translationService) {
@@ -35,23 +32,35 @@ public class MessageService {
         this.translationService = translationService;
     }
 
-    public MessageResponseDto sendMessage(SendMessageRequestDto requestDto) {
+    /**
+     * Core message-sending logic used by both the WebSocket and REST paths.
+     *
+     * Phase 6 change: senderEmail is now a separate parameter — the caller (controller)
+     * passes in the authenticated user's email from the JWT Principal.
+     * senderId is no longer read from the DTO (it was removed to close an impersonation hole).
+     *
+     * @param requestDto  the message payload from the client (receiverId, text, languages)
+     * @param senderEmail the authenticated sender's email — derived from JWT, never from the client
+     */
+    public MessageResponseDto sendMessage(SendMessageRequestDto requestDto, String senderEmail) {
 
-        log.info("Sending message | senderId: {} | receiverId: {}",
-                requestDto.getSenderId(), requestDto.getReceiverId());
+        log.info("Sending message | sender email: {} → receiverId: {}",
+                senderEmail, requestDto.getReceiverId());
 
-        User sender = userRepository.findById(requestDto.getSenderId())
-                .orElseThrow(() -> new RuntimeException("Sender not found with " + requestDto.getSenderId()));
+        // Look up sender by email (from the JWT) — the client can no longer supply this
+        User sender = userRepository.findByEmail(senderEmail)
+                .orElseThrow(() -> new RuntimeException("Sender not found: " + senderEmail));
 
         User receiver = userRepository.findById(requestDto.getReceiverId())
-                .orElseThrow(() -> new RuntimeException("Receiver not found with " + requestDto.getReceiverId()));
+                .orElseThrow(() -> new RuntimeException("Receiver not found with ID: " + requestDto.getReceiverId()));
 
         // Server-side translation — the client no longer sends translatedText.
         // isTranslationRequired() skips the API call when source == target language.
         String translatedText;
         if (translationService.isTranslationRequired(requestDto.getOriginalLanguage(),
                 requestDto.getTargetLanguage())) {
-            log.info("Translation required | {} → {}", requestDto.getOriginalLanguage(), requestDto.getTargetLanguage());
+            log.info("Translation required | {} → {}", requestDto.getOriginalLanguage(),
+                    requestDto.getTargetLanguage());
             translatedText = translationService.translate(
                     requestDto.getOriginalText(),
                     requestDto.getOriginalLanguage(),
