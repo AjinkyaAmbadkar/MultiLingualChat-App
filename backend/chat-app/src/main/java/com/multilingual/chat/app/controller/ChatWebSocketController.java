@@ -11,6 +11,10 @@ import org.springframework.stereotype.Controller;
 
 import com.multilingual.chat.app.dto.MessageResponseDto;
 import com.multilingual.chat.app.dto.SendMessageRequestDto;
+import com.multilingual.chat.app.dto.TypingEventDto;
+import com.multilingual.chat.app.dto.TypingRequestDto;
+import com.multilingual.chat.app.entity.User;
+import com.multilingual.chat.app.repository.UserRepository;
 import com.multilingual.chat.app.service.MessageService;
 
 /**
@@ -29,6 +33,7 @@ public class ChatWebSocketController {
     private static final Logger log = LoggerFactory.getLogger(ChatWebSocketController.class);
 
     private final MessageService messageService;
+    private final UserRepository userRepository;
 
     /**
      * SimpMessagingTemplate is Spring's way to PUSH messages from server → client.
@@ -38,8 +43,10 @@ public class ChatWebSocketController {
     private final SimpMessagingTemplate messagingTemplate;
 
     public ChatWebSocketController(MessageService messageService,
+                                   UserRepository userRepository,
                                    SimpMessagingTemplate messagingTemplate) {
         this.messageService = messageService;
+        this.userRepository = userRepository;
         this.messagingTemplate = messagingTemplate;
     }
 
@@ -89,5 +96,24 @@ public class ChatWebSocketController {
         String senderTopic = "/topic/user." + savedMessage.getSenderId();
         messagingTemplate.convertAndSend(senderTopic, savedMessage);
         log.info("[WS] Message echoed back to sender topic: {}", senderTopic);
+    }
+
+    /**
+     * Relays a typing indicator from sender → receiver.
+     * No DB interaction — purely in-memory relay. The receiver's UI shows/hides
+     * the typing bubble based on the isTyping flag.
+     */
+    @MessageMapping("/chat.typing")
+    public void typing(@Payload TypingRequestDto requestDto, Principal principal) {
+        String senderEmail = principal.getName();
+
+        User sender = userRepository.findByEmail(senderEmail)
+                .orElseThrow(() -> new RuntimeException("Sender not found: " + senderEmail));
+
+        TypingEventDto event = new TypingEventDto(sender.getId(), requestDto.getReceiverId(), requestDto.isTyping());
+
+        String receiverTopic = "/topic/user." + requestDto.getReceiverId();
+        messagingTemplate.convertAndSend(receiverTopic, event);
+        log.debug("[WS] Typing event relayed | sender: {} → receiver topic: {}", senderEmail, receiverTopic);
     }
 }

@@ -62,16 +62,23 @@ public class MessageService {
 
         // Only call OpenAI when languages actually differ — avoids unnecessary cost
         String translatedText;
+        String senderTranslatedText;
         if (translationService.isTranslationRequired(senderLanguage, receiverLanguage)) {
             log.info("Translation required | {} → {}", senderLanguage, receiverLanguage);
+            // Translate for receiver (what they will read)
             translatedText = translationService.translate(
                     requestDto.getOriginalText(),
                     senderLanguage,
                     receiverLanguage);
+            // Translate to sender's preferred language (auto-detect source) so sender sees their own message correctly
+            senderTranslatedText = translationService.translateToLanguage(
+                    requestDto.getOriginalText(),
+                    senderLanguage);
         } else {
             // Same language — deliver original text as-is, no API call
             log.info("No translation needed — both users speak: {}", senderLanguage);
             translatedText = requestDto.getOriginalText();
+            senderTranslatedText = requestDto.getOriginalText();
         }
 
         Message message = new Message();
@@ -81,6 +88,7 @@ public class MessageService {
         message.setTargetLanguage(receiverLanguage);
         message.setOriginalText(requestDto.getOriginalText());
         message.setTranslatedText(translatedText);
+        message.setSenderTranslatedText(senderTranslatedText);
         message.setTimestamp(LocalDateTime.now());
 
         Message savedMessage = messageRepository.save(message);
@@ -97,6 +105,7 @@ public class MessageService {
                 // message.getReceiver().getName(),
                 message.getOriginalText(),
                 message.getTranslatedText(),
+                message.getSenderTranslatedText(),
                 message.getOriginalLanguage(),
                 message.getTargetLanguage(),
                 message.getTimestamp());

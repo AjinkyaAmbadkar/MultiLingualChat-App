@@ -11,6 +11,7 @@ public class MessageResponseDto {
     // private String receiverName;
     private String originalText;
     private String translatedText;
+    private String senderTranslatedText;
     private String originalLanguage;
     private String targetLanguage;
     private LocalDateTime timestamp;
@@ -20,7 +21,7 @@ public class MessageResponseDto {
 
     public MessageResponseDto(Long id, Long senderId, // String senderName,
             Long receiverId, // String receiverName,
-            String originalText, String translatedText,
+            String originalText, String translatedText, String senderTranslatedText,
             String originalLanguage, String targetLanguage,
             LocalDateTime timestamp) {
         this.id = id;
@@ -30,6 +31,7 @@ public class MessageResponseDto {
         // this.receiverName = receiverName;
         this.originalText = originalText;
         this.translatedText = translatedText;
+        this.senderTranslatedText = senderTranslatedText;
         this.originalLanguage = originalLanguage;
         this.targetLanguage = targetLanguage;
         this.timestamp = timestamp;
@@ -75,6 +77,14 @@ public class MessageResponseDto {
 
     public void setTranslatedText(String translatedText) {
         this.translatedText = translatedText;
+    }
+
+    public String getSenderTranslatedText() {
+        return senderTranslatedText;
+    }
+
+    public void setSenderTranslatedText(String senderTranslatedText) {
+        this.senderTranslatedText = senderTranslatedText;
     }
 
     public String getOriginalLanguage() {

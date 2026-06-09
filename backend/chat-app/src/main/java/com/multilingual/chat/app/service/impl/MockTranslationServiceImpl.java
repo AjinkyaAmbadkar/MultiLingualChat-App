@@ -17,7 +17,11 @@ public class MockTranslationServiceImpl implements TranslationService {
 
     @Override
     public String translate(String text, String sourceLanguage, String targetLanguage) {
-        // Mock for now
         return "[Translated from " + sourceLanguage + " to " + targetLanguage + "]: " + text;
+    }
+
+    @Override
+    public String translateToLanguage(String text, String targetLanguage) {
+        return "[Translated to " + targetLanguage + "]: " + text;
     }
 }

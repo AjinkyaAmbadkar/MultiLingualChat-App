@@ -26,6 +26,9 @@ public class Message {
     @Column(name = "translated_text", columnDefinition = "TEXT")
     private String translatedText;
 
+    @Column(name = "sender_translated_text", columnDefinition = "TEXT")
+    private String senderTranslatedText;
+
     @Column(name = "original_language", nullable = false)
     private String originalLanguage;
 
@@ -88,6 +91,14 @@ public class Message {
 
     public void setTranslatedText(String translatedText) {
         this.translatedText = translatedText;
+    }
+
+    public String getSenderTranslatedText() {
+        return senderTranslatedText;
+    }
+
+    public void setSenderTranslatedText(String senderTranslatedText) {
+        this.senderTranslatedText = senderTranslatedText;
     }
 
     public String getOriginalLanguage() {

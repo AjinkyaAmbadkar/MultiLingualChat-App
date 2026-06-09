@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.multilingual.chat.app.entity.Message;
@@ -41,5 +42,12 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
             ORDER BY m.timestamp DESC
             """)
     List<Message> findLatestMessagePerConversation(User me);
+
+    @Query(value = """
+            SELECT DISTINCT CASE WHEN sender_id = :userId THEN receiver_id ELSE sender_id END
+            FROM messages
+            WHERE sender_id = :userId OR receiver_id = :userId
+            """, nativeQuery = true)
+    List<Long> findConversationPartnerIds(@Param("userId") Long userId);
 
 }
