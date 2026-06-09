@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useChat } from '../../context/ChatContext'
 import ConversationItem, { Avatar } from './ConversationItem'
 import NewChatModal from './NewChatModal'
+import SettingsModal from './SettingsModal'
 
 export default function Sidebar() {
   const { auth, signOut }                 = useAuth()
@@ -11,6 +12,7 @@ export default function Sidebar() {
           setActiveConversation,
           setMessages }                   = useChat()
   const [showModal, setShowModal]         = useState(false)
+  const [showSettings, setShowSettings]   = useState(false)
 
   function handleSelectUser(user) {
     setShowModal(false)
@@ -52,27 +54,16 @@ export default function Sidebar() {
         </div>
 
         {/* Profile row */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Avatar name={auth.user.name} pictureUrl={auth.user.pictureUrl} size="sm" />
-            <div>
-              <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>
-                {auth.user.name}
-              </p>
-              <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>
-                {auth.user.preferredLanguage}
-              </p>
-            </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Avatar name={auth.user.name} pictureUrl={auth.user.pictureUrl} size="sm" />
+          <div>
+            <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>
+              {auth.user.name}
+            </p>
+            <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>
+              {auth.user.preferredLanguage}
+            </p>
           </div>
-          <button onClick={signOut} title="Sign out" style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            fontSize: '16px', color: '#475569', padding: '4px', borderRadius: '6px', lineHeight: 1,
-          }}
-          onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
-          onMouseLeave={e => e.currentTarget.style.color = '#475569'}
-          >
-            ⏻
-          </button>
         </div>
       </div>
 
@@ -124,7 +115,35 @@ export default function Sidebar() {
         ))}
       </div>
 
+      {/* Bottom footer — settings + sign out */}
+      <div style={{
+        borderTop: '1px solid rgba(255,255,255,0.06)',
+        padding: '12px 16px',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      }}>
+        <span style={{ fontSize: '11px', color: '#334155' }}>v1.0</span>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button onClick={() => setShowSettings(true)} title="Settings" style={{
+            background: 'none', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
+            fontSize: '15px', color: '#475569', padding: '6px 10px', borderRadius: '8px', lineHeight: 1,
+            transition: 'all .15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.color = '#93c5fd'; e.currentTarget.style.borderColor = '#3b82f6' }}
+          onMouseLeave={e => { e.currentTarget.style.color = '#475569'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
+          >⚙️</button>
+          <button onClick={signOut} title="Sign out" style={{
+            background: 'none', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
+            fontSize: '15px', color: '#475569', padding: '6px 10px', borderRadius: '8px', lineHeight: 1,
+            transition: 'all .15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = '#ef4444' }}
+          onMouseLeave={e => { e.currentTarget.style.color = '#475569'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
+          >⏻</button>
+        </div>
+      </div>
+
       {showModal && <NewChatModal onSelect={handleSelectUser} onClose={() => setShowModal(false)} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </aside>
   )
 }

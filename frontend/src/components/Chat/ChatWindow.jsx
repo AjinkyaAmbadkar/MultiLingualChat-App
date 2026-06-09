@@ -1,14 +1,22 @@
 import { useEffect, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useChat } from '../../context/ChatContext'
+import { useCallback } from 'react'
 import { getChatHistory } from '../../api/messages'
 import { Avatar } from '../Sidebar/ConversationItem'
 import MessageBubble from './MessageBubble'
 import MessageInput from './MessageInput'
 
-export default function ChatWindow({ sendMessage }) {
-  const { auth }                                      = useAuth()
-  const { activeConversation, messages, setMessages } = useChat()
+export default function ChatWindow({ sendMessage, sendTyping }) {
+  const { auth }                                                      = useAuth()
+  const { activeConversation, messages, setMessages, typingUsers, onlineUsers } = useChat()
+
+  const isPartnerTyping = activeConversation && typingUsers[activeConversation.userId]
+  const isPartnerOnline = activeConversation && onlineUsers[activeConversation.userId]
+
+  const handleTyping = useCallback((isTyping) => {
+    if (activeConversation) sendTyping(activeConversation.userId, isTyping)
+  }, [activeConversation, sendTyping])
   const bottomRef                                     = useRef(null)
 
   useEffect(() => {
@@ -66,10 +74,22 @@ export default function ChatWindow({ sendMessage }) {
           <span style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>
             {activeConversation.name}
           </span>
-          <span style={{ fontSize: '12px', color: '#22c55e', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
-            Online
-          </span>
+          {isPartnerTyping ? (
+            <span style={{ fontSize: '12px', color: '#3b82f6', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }} />
+              typing...
+            </span>
+          ) : isPartnerOnline ? (
+            <span style={{ fontSize: '12px', color: '#22c55e', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+              Online
+            </span>
+          ) : (
+            <span style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#94a3b8', display: 'inline-block' }} />
+              Offline
+            </span>
+          )}
         </div>
       </div>
 
@@ -98,7 +118,32 @@ export default function ChatWindow({ sendMessage }) {
         <div ref={bottomRef} />
       </div>
 
-      <MessageInput onSend={text => sendMessage(activeConversation.userId, text)} />
+      {isPartnerTyping && (
+        <div style={{ padding: '0 24px 8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: '4px',
+            background: '#fff', borderRadius: '20px 20px 20px 4px',
+            padding: '10px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+          }}>
+            {[0, 1, 2].map(i => (
+              <span key={i} style={{
+                width: '7px', height: '7px', borderRadius: '50%', background: '#94a3b8',
+                display: 'inline-block',
+                animation: 'typingBounce 1.2s infinite',
+                animationDelay: `${i * 0.2}s`,
+              }} />
+            ))}
+          </div>
+          <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+            {activeConversation.name.split(' ')[0]} is typing…
+          </span>
+        </div>
+      )}
+
+      <MessageInput
+        onSend={text => sendMessage(activeConversation.userId, text)}
+        onTyping={handleTyping}
+      />
     </div>
   )
 }

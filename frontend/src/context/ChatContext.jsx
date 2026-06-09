@@ -6,6 +6,16 @@ export function ChatProvider({ children }) {
   const [conversations, setConversations] = useState([])
   const [activeConversation, setActiveConversation] = useState(null) // { userId, name, pictureUrl }
   const [messages, setMessages] = useState([])                        // messages for active conversation
+  const [typingUsers, setTypingUsers] = useState({})                  // { [userId]: true/false }
+  const [onlineUsers, setOnlineUsers] = useState({})                  // { [userId]: true/false }
+
+  const setTyping = useCallback((senderId, isTyping) => {
+    setTypingUsers(prev => ({ ...prev, [senderId]: isTyping }))
+  }, [])
+
+  const setPresence = useCallback((userId, online) => {
+    setOnlineUsers(prev => ({ ...prev, [userId]: online }))
+  }, [])
 
   // Called by useWebSocket when a new message arrives over STOMP
   const addMessage = useCallback((msg) => {
@@ -31,6 +41,8 @@ export function ChatProvider({ children }) {
       activeConversation, setActiveConversation,
       messages, setMessages,
       addMessage,
+      typingUsers, setTyping,
+      onlineUsers, setPresence,
     }}>
       {children}
     </ChatContext.Provider>

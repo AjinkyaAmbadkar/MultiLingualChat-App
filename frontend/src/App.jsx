@@ -9,13 +9,15 @@ import ChatWindow from './components/Chat/ChatWindow'
 
 export default function App() {
   const { auth }                         = useAuth()
-  const { setConversations, addMessage } = useChat()
+  const { setConversations, addMessage, setTyping, setPresence } = useChat()
 
   // WebSocket — connects only when logged in
-  const { sendMessage } = useWebSocket({
-    token:     auth?.token,
-    userId:    auth?.user?.id,
-    onMessage: addMessage,
+  const { sendMessage, sendTyping } = useWebSocket({
+    token:      auth?.token,
+    userId:     auth?.user?.id,
+    onMessage:  addMessage,
+    onTyping:   (event) => setTyping(event.senderId, event.typing),
+    onPresence: (event) => setPresence(event.userId, event.online),
   })
 
   // Load conversation list on login
@@ -31,7 +33,7 @@ export default function App() {
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden">
       <Sidebar />
-      <ChatWindow sendMessage={sendMessage} />
+      <ChatWindow sendMessage={sendMessage} sendTyping={sendTyping} />
     </div>
   )
 }

@@ -2,15 +2,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 
-/**
- * Manages the STOMP WebSocket connection.
- *
- * - Connects on mount with the JWT in STOMP CONNECT headers
- * - Subscribes to /topic/user.{myUserId} for incoming messages
- * - Exposes sendMessage() for the chat input
- * - Disconnects cleanly on unmount
- */
-export function useWebSocket({ token, userId, onMessage }) {
+export function useWebSocket({ token, userId, onMessage, onTyping, onPresence }) {
   const clientRef = useRef(null)
 
   useEffect(() => {
@@ -22,8 +14,14 @@ export function useWebSocket({ token, userId, onMessage }) {
       reconnectDelay: 5000,
       onConnect: () => {
         client.subscribe(`/topic/user.${userId}`, (frame) => {
-          const msg = JSON.parse(frame.body)
-          onMessage(msg)
+          const data = JSON.parse(frame.body)
+          if (data.type === 'PRESENCE') {
+            onPresence?.(data)
+          } else if ('typing' in data) {
+            onTyping?.(data)
+          } else {
+            onMessage(data)
+          }
         })
       },
       onStompError: (frame) => {
@@ -35,7 +33,7 @@ export function useWebSocket({ token, userId, onMessage }) {
     clientRef.current = client
 
     return () => { client.deactivate() }
-  }, [token, userId]) // intentionally omit onMessage — it's stable via useCallback
+  }, [token, userId])
 
   const sendMessage = useCallback((receiverId, originalText) => {
     if (!clientRef.current?.connected) return
@@ -45,5 +43,13 @@ export function useWebSocket({ token, userId, onMessage }) {
     })
   }, [])
 
-  return { sendMessage }
+  const sendTyping = useCallback((receiverId, isTyping) => {
+    if (!clientRef.current?.connected) return
+    clientRef.current.publish({
+      destination: '/app/chat.typing',
+      body: JSON.stringify({ receiverId, typing: isTyping }),
+    })
+  }, [])
+
+  return { sendMessage, sendTyping }
 }

@@ -1,11 +1,26 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 
-export default function MessageInput({ onSend, disabled }) {
+export default function MessageInput({ onSend, onTyping, disabled }) {
   const [text, setText] = useState('')
+  const typingTimerRef  = useRef(null)
+
+  function handleChange(e) {
+    setText(e.target.value)
+    if (onTyping) {
+      onTyping(true)
+      clearTimeout(typingTimerRef.current)
+      typingTimerRef.current = setTimeout(() => onTyping(false), 2000)
+    }
+  }
 
   function submit() {
     const trimmed = text.trim()
     if (!trimmed || disabled) return
+    // Stop typing indicator immediately on send
+    if (onTyping) {
+      clearTimeout(typingTimerRef.current)
+      onTyping(false)
+    }
     onSend(trimmed)
     setText('')
   }
@@ -18,7 +33,7 @@ export default function MessageInput({ onSend, disabled }) {
     }}>
       <input
         type="text" value={text} disabled={disabled}
-        onChange={e => setText(e.target.value)}
+        onChange={handleChange}
         onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit() } }}
         placeholder="Type a message…"
         style={{

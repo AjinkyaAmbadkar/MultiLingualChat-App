@@ -1,11 +1,21 @@
+import { useState } from 'react'
+
 export default function MessageBubble({ message, isSent }) {
+  const [showOriginal, setShowOriginal] = useState(false)
+
   const time = message.timestamp
     ? new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : ''
 
-  const text = isSent
-    ? message.originalText
+  // For sent messages: show senderTranslatedText (user's preferred language).
+  // For received messages: show translatedText (also user's preferred language).
+  // Toggle reveals originalText (what was literally typed).
+  const preferredText = isSent
+    ? (message.senderTranslatedText || message.originalText)
     : (message.translatedText || message.originalText)
+
+  const hasOriginal = message.originalText && message.originalText !== preferredText
+  const displayText = showOriginal ? message.originalText : preferredText
 
   return (
     <div style={{ display: 'flex', justifyContent: isSent ? 'flex-end' : 'flex-start', marginBottom: '6px' }}>
@@ -18,8 +28,23 @@ export default function MessageBubble({ message, isSent }) {
         color: isSent ? '#fff' : '#0f172a',
       }}>
         <p style={{ margin: 0, fontSize: '14px', lineHeight: 1.55, wordBreak: 'break-word' }}>
-          {text}
+          {displayText}
         </p>
+
+        {hasOriginal && (
+          <button
+            onClick={() => setShowOriginal(prev => !prev)}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0 0',
+              fontSize: '11px',
+              color: isSent ? 'rgba(255,255,255,0.55)' : '#94a3b8',
+              textDecoration: 'underline', display: 'block',
+            }}
+          >
+            {showOriginal ? 'See translation' : 'See original'}
+          </button>
+        )}
+
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
           gap: '4px', marginTop: '4px',
