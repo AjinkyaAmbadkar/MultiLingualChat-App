@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import com.multilingual.chat.app.entity.Message;
+import com.multilingual.chat.app.entity.User;
 
 @Repository
 public interface MessageRepository extends JpaRepository<Message, Long> {
@@ -18,5 +19,27 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
             ORDER BY m.timestamp ASC
             """)
     List<Message> findChatHistory(Long user1Id, Long user2Id);
+
+    /**
+     * Returns the latest message exchanged between the current user and each other participant.
+     * Used to populate the conversation list in the sidebar.
+     *
+     * For each unique conversation partner, we want only the most recent message.
+     * The subquery finds the max timestamp per conversation pair, then we join back
+     * to get the full Message row for that timestamp.
+     */
+    @Query("""
+            SELECT m FROM Message m
+            WHERE (m.sender = :me OR m.receiver = :me)
+            AND m.timestamp = (
+                SELECT MAX(m2.timestamp) FROM Message m2
+                WHERE (m2.sender = :me AND m2.receiver = m.receiver)
+                   OR (m2.receiver = :me AND m2.sender = m.sender)
+                   OR (m2.sender = :me AND m2.receiver = m.sender)
+                   OR (m2.receiver = :me AND m2.sender = m.receiver)
+            )
+            ORDER BY m.timestamp DESC
+            """)
+    List<Message> findLatestMessagePerConversation(User me);
 
 }

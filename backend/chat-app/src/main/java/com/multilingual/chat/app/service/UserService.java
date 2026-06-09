@@ -52,4 +52,33 @@ public class UserService {
                 });
     }
 
+    /**
+     * Returns the currently authenticated user's profile by email.
+     * Used by GET /api/users/me — the email comes from the JWT Principal.
+     */
+    public User getUserByEmail(String email) {
+        log.debug("Fetching user by email: {}", email);
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> {
+                    log.warn("User not found for email: {}", email);
+                    return new RuntimeException("User not found");
+                });
+    }
+
+    /**
+     * Updates the preferred language for the currently authenticated user.
+     * Used by PATCH /api/users/me/language — the email comes from the JWT Principal.
+     *
+     * This is the only way language changes — the client never sends language
+     * in message payloads anymore. MessageService reads it directly from DB.
+     */
+    public User updatePreferredLanguage(String email, String newLanguage) {
+        log.info("Updating preferred language | email: {} → language: {}", email, newLanguage);
+        User user = getUserByEmail(email);
+        user.setPreferredLanguage(newLanguage);
+        User savedUser = userRepository.save(user);
+        log.info("Language updated successfully | userId: {}", savedUser.getId());
+        return savedUser;
+    }
+
 }

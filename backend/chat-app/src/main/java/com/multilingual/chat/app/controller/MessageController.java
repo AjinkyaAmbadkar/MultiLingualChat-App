@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.multilingual.chat.app.dto.ConversationDto;
 import com.multilingual.chat.app.dto.MessageResponseDto;
 import com.multilingual.chat.app.dto.SendMessageRequestDto;
 import com.multilingual.chat.app.entity.Message;
@@ -49,9 +50,19 @@ public class MessageController {
     }
 
     @GetMapping("/history")
-    public List<Message> getChatHistory(@RequestParam long user1Id,
+    public List<MessageResponseDto> getChatHistory(@RequestParam long user1Id,
             @RequestParam long user2Id) {
         return messageService.getChatHistory(user1Id, user2Id);
+    }
+
+    /**
+     * Returns the conversation list for the authenticated user's sidebar.
+     * One entry per unique chat partner, ordered by most recent message first.
+     */
+    @GetMapping("/conversations")
+    public List<ConversationDto> getConversations(Authentication authentication) {
+        log.debug("GET /api/messages/conversations | user: {}", authentication.getName());
+        return messageService.getConversations(authentication.getName());
     }
 
 }

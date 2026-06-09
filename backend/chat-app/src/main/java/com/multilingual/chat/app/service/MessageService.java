@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import com.multilingual.chat.app.dto.ConversationDto;
 import com.multilingual.chat.app.dto.MessageResponseDto;
 import com.multilingual.chat.app.dto.SendMessageRequestDto;
 import com.multilingual.chat.app.entity.Message;
@@ -35,11 +36,11 @@ public class MessageService {
     /**
      * Core message-sending logic used by both the WebSocket and REST paths.
      *
-     * Phase 6 change: senderEmail is now a separate parameter — the caller (controller)
-     * passes in the authenticated user's email from the JWT Principal.
-     * senderId is no longer read from the DTO (it was removed to close an impersonation hole).
+     * Phase 6: senderEmail derived from JWT Principal — client can no longer forge sender.
+     * Phase 7: originalLanguage + targetLanguage derived from DB (sender/receiver preferredLanguage).
+     *          OpenAI is called ONLY when the two languages differ — saves cost for same-language chats.
      *
-     * @param requestDto  the message payload from the client (receiverId, text, languages)
+     * @param requestDto  the message payload from the client (receiverId + text only)
      * @param senderEmail the authenticated sender's email — derived from JWT, never from the client
      */
     public MessageResponseDto sendMessage(SendMessageRequestDto requestDto, String senderEmail) {
@@ -47,36 +48,37 @@ public class MessageService {
         log.info("Sending message | sender email: {} → receiverId: {}",
                 senderEmail, requestDto.getReceiverId());
 
-        // Look up sender by email (from the JWT) — the client can no longer supply this
+        // Look up sender by email (from JWT) — cannot be forged by client
         User sender = userRepository.findByEmail(senderEmail)
                 .orElseThrow(() -> new RuntimeException("Sender not found: " + senderEmail));
 
         User receiver = userRepository.findById(requestDto.getReceiverId())
                 .orElseThrow(() -> new RuntimeException("Receiver not found with ID: " + requestDto.getReceiverId()));
 
-        // Server-side translation — the client no longer sends translatedText.
-        // isTranslationRequired() skips the API call when source == target language.
+        // Derive languages from DB — client no longer supplies these
+        // This ensures language preferences are always authoritative from the server side
+        String senderLanguage   = sender.getPreferredLanguage();
+        String receiverLanguage = receiver.getPreferredLanguage();
+
+        // Only call OpenAI when languages actually differ — avoids unnecessary cost
         String translatedText;
-        if (translationService.isTranslationRequired(requestDto.getOriginalLanguage(),
-                requestDto.getTargetLanguage())) {
-            log.info("Translation required | {} → {}", requestDto.getOriginalLanguage(),
-                    requestDto.getTargetLanguage());
+        if (translationService.isTranslationRequired(senderLanguage, receiverLanguage)) {
+            log.info("Translation required | {} → {}", senderLanguage, receiverLanguage);
             translatedText = translationService.translate(
                     requestDto.getOriginalText(),
-                    requestDto.getOriginalLanguage(),
-                    requestDto.getTargetLanguage());
+                    senderLanguage,
+                    receiverLanguage);
         } else {
-            // Same language — no translation needed, store original text as-is
-            log.info("No translation needed — source and target language are the same: {}",
-                    requestDto.getOriginalLanguage());
+            // Same language — deliver original text as-is, no API call
+            log.info("No translation needed — both users speak: {}", senderLanguage);
             translatedText = requestDto.getOriginalText();
         }
 
         Message message = new Message();
         message.setSender(sender);
         message.setReceiver(receiver);
-        message.setOriginalLanguage(requestDto.getOriginalLanguage());
-        message.setTargetLanguage(requestDto.getTargetLanguage());
+        message.setOriginalLanguage(senderLanguage);
+        message.setTargetLanguage(receiverLanguage);
         message.setOriginalText(requestDto.getOriginalText());
         message.setTranslatedText(translatedText);
         message.setTimestamp(LocalDateTime.now());
@@ -100,8 +102,51 @@ public class MessageService {
                 message.getTimestamp());
     }
 
-    public List<Message> getChatHistory(Long user1Id, Long user2Id) {
-        return messageRepository.findChatHistory(user1Id, user2Id);
+    public List<MessageResponseDto> getChatHistory(Long user1Id, Long user2Id) {
+        return messageRepository.findChatHistory(user1Id, user2Id)
+                .stream().map(this::mapToMessageResponseDto).toList();
+    }
+
+    /**
+     * Returns the conversation list for the sidebar — one entry per unique chat partner,
+     * showing the last message and the other person's info.
+     *
+     * Deduplication: the DB query may return two rows for the same partner (one where
+     * current user was sender, one where receiver). We deduplicate by keeping only the
+     * most recent row per partner using a LinkedHashMap keyed on partner userId.
+     */
+    public List<ConversationDto> getConversations(String currentUserEmail) {
+        User me = userRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
+
+        List<Message> latestMessages = messageRepository.findLatestMessagePerConversation(me);
+
+        // Deduplicate: keep only the most recent message per conversation partner
+        java.util.LinkedHashMap<Long, ConversationDto> byPartner = new java.util.LinkedHashMap<>();
+
+        for (Message msg : latestMessages) {
+            User partner = msg.getSender().getId().equals(me.getId())
+                    ? msg.getReceiver()
+                    : msg.getSender();
+
+            if (byPartner.containsKey(partner.getId())) continue;
+
+            // Show the translated text as preview if available (receiver sees translated)
+            String preview = msg.getTranslatedText() != null
+                    ? msg.getTranslatedText()
+                    : msg.getOriginalText();
+
+            byPartner.put(partner.getId(), new ConversationDto(
+                    partner.getId(),
+                    partner.getname(),
+                    partner.getPictureUrl(),
+                    preview,
+                    msg.getTimestamp(),
+                    0L   // unread count — placeholder until read receipts are implemented
+            ));
+        }
+
+        return new java.util.ArrayList<>(byPartner.values());
     }
 
 }

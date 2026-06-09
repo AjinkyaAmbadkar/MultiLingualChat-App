@@ -6,18 +6,16 @@ import jakarta.validation.constraints.NotNull;
 /**
  * Payload the client sends when posting a chat message.
  *
- * Phase 6 change: senderId REMOVED.
+ * Phase 6:  senderId removed — server derives sender from JWT Principal.
+ * Phase 7:  originalLanguage + targetLanguage removed — server derives both
+ *           from sender.preferredLanguage and receiver.preferredLanguage stored in DB.
  *
- * Before Phase 6, the client told the server "I am user 5" — a security hole:
- * any authenticated user could impersonate any other user by forging senderId in the payload.
+ * The client now only needs to supply the bare minimum:
+ *   receiverId   — who to send to
+ *   originalText — what to say
  *
- * Now the server derives the sender's identity from the JWT Principal:
- *   - WebSocket path: Principal set by JwtChannelInterceptor at STOMP CONNECT time
- *   - REST path:      Authentication set by JwtAuthFilter on every HTTP request
- *
- * The client only needs to supply what it legitimately knows:
- *   receiverId — who to message
- *   originalText / originalLanguage / targetLanguage — the message content
+ * The server handles everything else: who sent it, what languages to use,
+ * whether translation is needed, and calling OpenAI only when languages differ.
  */
 public class SendMessageRequestDto {
 
@@ -26,15 +24,6 @@ public class SendMessageRequestDto {
 
     @NotBlank(message = "Original text is required")
     private String originalText;
-
-    // translatedText removed in a previous phase — the server calls OpenAI automatically.
-    // senderId removed in Phase 6 — the server derives it from the JWT Principal.
-
-    @NotBlank(message = "Original language is required")
-    private String originalLanguage;
-
-    @NotBlank(message = "Target language is required")
-    private String targetLanguage;
 
     public SendMessageRequestDto() {
     }
@@ -53,21 +42,5 @@ public class SendMessageRequestDto {
 
     public void setOriginalText(String originalText) {
         this.originalText = originalText;
-    }
-
-    public String getOriginalLanguage() {
-        return originalLanguage;
-    }
-
-    public void setOriginalLanguage(String originalLanguage) {
-        this.originalLanguage = originalLanguage;
-    }
-
-    public String getTargetLanguage() {
-        return targetLanguage;
-    }
-
-    public void setTargetLanguage(String targetLanguage) {
-        this.targetLanguage = targetLanguage;
     }
 }

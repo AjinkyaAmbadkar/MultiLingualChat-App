@@ -287,20 +287,20 @@
 
   <!--
     ══════════════════════════════════════════════════════
-    STEP 2 — Connect to WebSocket (visible after login)
-    JWT is passed automatically in STOMP CONNECT headers.
+    LANGUAGE SETUP — shown only for first-time Google
+    users who got defaulted to "en". Lets them pick their
+    real preferred language before entering chat.
     ══════════════════════════════════════════════════════
   -->
-  <div class="panel" id="connect-panel" style="display:none">
-    <h2>Step 2 — Connect to Chat</h2>
+  <div class="panel" id="language-setup-panel" style="display:none">
+    <h2>Set Your Language</h2>
+    <p style="font-size:12px;color:#667781;margin-bottom:10px;">
+      Choose the language you want to receive messages in. You can change this anytime in your profile.
+    </p>
     <div class="field-row">
       <div class="field-group">
-        <label>Logged in as</label>
-        <input id="display-name" type="text" disabled/>
-      </div>
-      <div class="field-group">
-        <label>My Language</label>
-        <select id="my-lang">
+        <label>My Preferred Language</label>
+        <select id="setup-lang">
           <option value="English">English</option>
           <option value="Spanish">Spanish</option>
           <option value="French">French</option>
@@ -311,6 +311,24 @@
           <option value="Portuguese">Portuguese</option>
           <option value="Mandarin">Mandarin</option>
         </select>
+      </div>
+    </div>
+    <button class="btn-primary" id="btn-save-language">Save & Continue</button>
+    <div class="status-label" id="lang-setup-status"></div>
+  </div>
+
+  <!--
+    ══════════════════════════════════════════════════════
+    STEP 2 — Connect to WebSocket (visible after login)
+    JWT is passed automatically in STOMP CONNECT headers.
+    ══════════════════════════════════════════════════════
+  -->
+  <div class="panel" id="connect-panel" style="display:none">
+    <h2>Step 2 — Connect to Chat</h2>
+    <div class="field-row">
+      <div class="field-group">
+        <label>Logged in as</label>
+        <input id="display-name" type="text" disabled/>
       </div>
     </div>
     <button class="btn-primary" id="btn-connect">Connect to Chat</button>
@@ -326,19 +344,6 @@
     <div class="send-top">
       <div style="flex:1">
         <input id="to-user-id" type="number" placeholder="Send to User ID" min="1"/>
-      </div>
-      <div style="flex:1">
-        <select id="to-lang">
-          <option value="Spanish">→ Spanish</option>
-          <option value="English">→ English</option>
-          <option value="French">→ French</option>
-          <option value="German">→ German</option>
-          <option value="Hindi">→ Hindi</option>
-          <option value="Marathi">→ Marathi</option>
-          <option value="Japanese">→ Japanese</option>
-          <option value="Portuguese">→ Portuguese</option>
-          <option value="Mandarin">→ Mandarin</option>
-        </select>
       </div>
     </div>
     <div class="send-bottom">
@@ -357,11 +362,11 @@
 
 <script>
   // ── State ─────────────────────────────────────────────────────────────────
-  let stompClient  = null;
-  let myUserId     = null;   // filled from /auth/login response
-  let myName       = "Me";   // filled from /auth/login response
-  let myLang       = "English";
-  let accessToken  = null;   // JWT — filled from /auth/login response
+  let stompClient   = null;
+  let myUserId      = null;    // filled from /auth/login response
+  let myName        = "Me";    // filled from /auth/login response
+  let accessToken   = null;    // JWT — filled from /auth/login response
+  let isGoogleUser  = false;   // true when logged in via Google (may need language setup)
 
   // ── DOM refs ──────────────────────────────────────────────────────────────
   const loginPanel   = document.getElementById('login-panel');
@@ -435,12 +440,32 @@
 
       addLog(`✅ Google login OK — ${myName} (userId: ${myUserId})`);
       showLoginStatus(`Logged in as ${myName} (Google)`, true);
+      isGoogleUser = true;
 
       document.getElementById('display-name').value = `${myName} (ID: ${myUserId})`;
-      document.getElementById('connect-panel').style.display = 'block';
       document.getElementById('btn-login').textContent = 'Logged in ✓';
       document.getElementById('btn-login').disabled = true;
       btn.textContent = '✓ Signed in with Google';
+
+      // Fetch the user's profile to check their preferred language.
+      // New Google users are defaulted to "en" — show the language setup panel
+      // so they can set their real preferred language before entering chat.
+      const profileResp = await fetch('/api/users/me', {
+        headers: { 'Authorization': 'Bearer ' + accessToken }
+      });
+      if (profileResp.ok) {
+        const profile = await profileResp.json();
+        if (profile.preferredLanguage === 'en' || profile.preferredLanguage === 'English') {
+          // Show language setup — let them confirm or change before connecting
+          document.getElementById('language-setup-panel').style.display = 'block';
+        } else {
+          // Already has a non-default language — go straight to connect
+          document.getElementById('connect-panel').style.display = 'block';
+        }
+      } else {
+        // If profile fetch fails, skip setup and show connect directly
+        document.getElementById('connect-panel').style.display = 'block';
+      }
 
     } catch (err) {
       addLog(`Google login failed: ${err.message}`, 'error');
@@ -492,6 +517,7 @@
       document.getElementById('display-name').value = `${myName} (ID: ${myUserId})`;
       connectPanel.style.display = 'block';
       btnLogin.textContent = 'Logged in ✓';
+      isGoogleUser = false;
 
     } catch (err) {
       addLog(`Login failed: ${err.message}`, 'error');
@@ -505,6 +531,44 @@
     loginStatus.textContent = msg;
     loginStatus.className = 'status-label ' + (success ? 'ok' : 'err');
   }
+
+  // ── Language Setup (first-time Google users) ──────────────────────────────
+  // Calls PATCH /api/users/me/language, then reveals the connect panel.
+  document.getElementById('btn-save-language').addEventListener('click', async () => {
+    const lang = document.getElementById('setup-lang').value;
+    const statusEl = document.getElementById('lang-setup-status');
+    const btn = document.getElementById('btn-save-language');
+
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    try {
+      const resp = await fetch('/api/users/me/language', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + accessToken
+        },
+        body: JSON.stringify({ preferredLanguage: lang })
+      });
+
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+      addLog(`✅ Language set to ${lang}`);
+      statusEl.textContent = `Language saved: ${lang}`;
+      statusEl.className = 'status-label ok';
+
+      // Hide language setup, show connect panel
+      document.getElementById('language-setup-panel').style.display = 'none';
+      document.getElementById('connect-panel').style.display = 'block';
+
+    } catch (err) {
+      statusEl.textContent = `Failed to save language: ${err.message}`;
+      statusEl.className = 'status-label err';
+      btn.disabled = false;
+      btn.textContent = 'Save & Continue';
+    }
+  });
 
   // ── STEP 2: Connect to WebSocket ──────────────────────────────────────────
   // Phase 6 key change: we pass the JWT in the STOMP CONNECT frame headers.
@@ -523,9 +587,7 @@
       return;
     }
 
-    myLang = document.getElementById('my-lang').value;
-
-    addLog(`Connecting as ${myName} (userId: ${myUserId}, lang: ${myLang})…`);
+    addLog(`Connecting as ${myName} (userId: ${myUserId})…`);
     btnConnect.disabled = true;
     btnConnect.textContent = 'Connecting…';
 
@@ -574,7 +636,7 @@
         statusDot.classList.add('connected');
         avatar.textContent     = myName[0].toUpperCase();
         headerName.textContent = `${myName} (ID: ${myUserId})`;
-        headerSub.textContent  = `Connected · ${myLang}`;
+        headerSub.textContent  = `Connected`;
         btnConnect.textContent = 'Connected ✓';
         msgInput.disabled      = false;
         btnSend.disabled       = false;
@@ -601,29 +663,24 @@
 
   // ── Send message ──────────────────────────────────────────────────────────
   function sendMessage() {
-    const text       = msgInput.value.trim();
-    const toUserId   = document.getElementById('to-user-id').value.trim();
-    const targetLang = document.getElementById('to-lang').value;
+    const text     = msgInput.value.trim();
+    const toUserId = document.getElementById('to-user-id').value.trim();
 
     if (!text)     { alert('Type a message first!'); return; }
     if (!toUserId) { alert('Enter the receiver\'s User ID!'); return; }
     if (!stompClient?.connected) { alert('Not connected!'); return; }
 
     /*
-     * Phase 6 change: senderId is GONE from the payload.
+     * Phase 7 change: originalLanguage + targetLanguage removed from payload.
      *
-     * Before: { senderId: 1, receiverId: 2, ... }
-     * After:  { receiverId: 2, ... }
+     * The server now derives both from the sender's and receiver's preferredLanguage
+     * stored in the DB. OpenAI is only called when they differ.
      *
-     * The server derives senderId from the JWT Principal set during STOMP CONNECT.
-     * Any attempt to put senderId back would simply be ignored by the server
-     * because SendMessageRequestDto no longer has that field.
+     * Payload is now as minimal as possible — just who to send to and what to say.
      */
     const payload = {
-      receiverId:       parseInt(toUserId),
-      originalText:     text,
-      originalLanguage: myLang,
-      targetLanguage:   targetLang
+      receiverId:   parseInt(toUserId),
+      originalText: text
     };
 
     addLog(`📤 Sending to /app/chat.send → ${JSON.stringify(payload)}`);
