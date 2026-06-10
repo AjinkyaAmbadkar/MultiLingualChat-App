@@ -1,0 +1,50 @@
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       chatapp
+      POSTGRES_USER:     chatapp_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chatapp_user -d chatapp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend/chat-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL:      jdbc:postgresql://postgres:5432/chatapp
+      SPRING_DATASOURCE_USERNAME: chatapp_user
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      OPENAI_API_KEY:             ${OPENAI_API_KEY}
+      GOOGLE_CLIENT_ID:           ${GOOGLE_CLIENT_ID}
+      JWT_SECRET:                 ${JWT_SECRET}
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/test || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  postgres_data:
