@@ -10,10 +10,12 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 import com.multilingual.chat.app.dto.MessageResponseDto;
+import com.multilingual.chat.app.dto.ReadReceiptDto;
 import com.multilingual.chat.app.dto.SendMessageRequestDto;
 import com.multilingual.chat.app.dto.TypingEventDto;
 import com.multilingual.chat.app.dto.TypingRequestDto;
 import com.multilingual.chat.app.entity.User;
+import com.multilingual.chat.app.repository.MessageRepository;
 import com.multilingual.chat.app.repository.UserRepository;
 import com.multilingual.chat.app.service.MessageService;
 
@@ -34,6 +36,7 @@ public class ChatWebSocketController {
 
     private final MessageService messageService;
     private final UserRepository userRepository;
+    private final MessageRepository messageRepository;
 
     /**
      * SimpMessagingTemplate is Spring's way to PUSH messages from server → client.
@@ -44,9 +47,11 @@ public class ChatWebSocketController {
 
     public ChatWebSocketController(MessageService messageService,
                                    UserRepository userRepository,
+                                   MessageRepository messageRepository,
                                    SimpMessagingTemplate messagingTemplate) {
         this.messageService = messageService;
         this.userRepository = userRepository;
+        this.messageRepository = messageRepository;
         this.messagingTemplate = messagingTemplate;
     }
 
@@ -115,5 +120,30 @@ public class ChatWebSocketController {
         String receiverTopic = "/topic/user." + requestDto.getReceiverId();
         messagingTemplate.convertAndSend(receiverTopic, event);
         log.debug("[WS] Typing event relayed | sender: {} → receiver topic: {}", senderEmail, receiverTopic);
+    }
+
+    /**
+     * Marks all unread messages from a given sender as read, then notifies the
+     * original sender so their tick marks update to blue in real-time.
+     *
+     * Payload: { "senderId": <id of the person whose messages are being read> }
+     */
+    @MessageMapping("/chat.read")
+    public void markAsRead(@Payload ReadReceiptDto requestDto, Principal principal) {
+        String readerEmail = principal.getName();
+
+        User reader = userRepository.findByEmail(readerEmail)
+                .orElseThrow(() -> new RuntimeException("Reader not found: " + readerEmail));
+
+        int updated = messageRepository.markMessagesAsRead(requestDto.getSenderId(), reader.getId());
+        log.info("[WS] Marked {} messages as read | sender: {} → reader: {}", updated, requestDto.getSenderId(), reader.getId());
+
+        if (updated > 0) {
+            // Notify the original sender so their ✓✓ turns blue
+            ReadReceiptDto receipt = new ReadReceiptDto(reader.getId(), requestDto.getSenderId());
+            String senderTopic = "/topic/user." + requestDto.getSenderId();
+            messagingTemplate.convertAndSend(senderTopic, receipt);
+            log.info("[WS] Read receipt pushed to sender topic: {}", senderTopic);
+        }
     }
 }

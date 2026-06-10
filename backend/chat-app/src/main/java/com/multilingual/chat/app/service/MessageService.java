@@ -1,6 +1,8 @@
 package com.multilingual.chat.app.service;
 
+import java.security.PublicKey;
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -14,6 +16,7 @@ import com.multilingual.chat.app.entity.Message;
 import com.multilingual.chat.app.entity.User;
 import com.multilingual.chat.app.repository.MessageRepository;
 import com.multilingual.chat.app.repository.UserRepository;
+
 @Service
 public class MessageService {
 
@@ -22,107 +25,132 @@ public class MessageService {
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
     private final TranslationService translationService;
+    private final EncryptionService encryptionService;
 
-    // Constructor injection — Spring automatically wires all three dependencies.
-    // Since OpenAiTranslationServiceImpl is @Primary, that's what gets injected here.
     public MessageService(MessageRepository messageRepository,
             UserRepository userRepository,
-            TranslationService translationService) {
+            TranslationService translationService,
+            EncryptionService encryptionService) {
         this.messageRepository = messageRepository;
         this.userRepository = userRepository;
         this.translationService = translationService;
+        this.encryptionService = encryptionService;
     }
 
     /**
-     * Core message-sending logic used by both the WebSocket and REST paths.
+     * Core message-sending logic.
      *
-     * Phase 6: senderEmail derived from JWT Principal — client can no longer forge sender.
-     * Phase 7: originalLanguage + targetLanguage derived from DB (sender/receiver preferredLanguage).
-     *          OpenAI is called ONLY when the two languages differ — saves cost for same-language chats.
-     *
-     * @param requestDto  the message payload from the client (receiverId + text only)
-     * @param senderEmail the authenticated sender's email — derived from JWT, never from the client
+     * Phase 8.5: after translation, both plaintext strings are AES-256-GCM encrypted
+     * before being persisted. The AES key is wrapped with each user's RSA public key.
+     * Plaintext variables are nulled out after use (best-effort; GC handles the rest).
      */
     public MessageResponseDto sendMessage(SendMessageRequestDto requestDto, String senderEmail) {
 
         log.info("Sending message | sender email: {} → receiverId: {}",
                 senderEmail, requestDto.getReceiverId());
 
-        // Look up sender by email (from JWT) — cannot be forged by client
         User sender = userRepository.findByEmail(senderEmail)
                 .orElseThrow(() -> new RuntimeException("Sender not found: " + senderEmail));
 
         User receiver = userRepository.findById(requestDto.getReceiverId())
                 .orElseThrow(() -> new RuntimeException("Receiver not found with ID: " + requestDto.getReceiverId()));
 
-        // Derive languages from DB — client no longer supplies these
-        // This ensures language preferences are always authoritative from the server side
         String senderLanguage   = sender.getPreferredLanguage();
         String receiverLanguage = receiver.getPreferredLanguage();
 
-        // Only call OpenAI when languages actually differ — avoids unnecessary cost
+        String originalText;
         String translatedText;
         String senderTranslatedText;
+
         if (translationService.isTranslationRequired(senderLanguage, receiverLanguage)) {
             log.info("Translation required | {} → {}", senderLanguage, receiverLanguage);
-            // Translate for receiver (what they will read)
-            translatedText = translationService.translate(
-                    requestDto.getOriginalText(),
-                    senderLanguage,
-                    receiverLanguage);
-            // Translate to sender's preferred language (auto-detect source) so sender sees their own message correctly
-            senderTranslatedText = translationService.translateToLanguage(
-                    requestDto.getOriginalText(),
-                    senderLanguage);
+            originalText        = requestDto.getOriginalText();
+            translatedText      = translationService.translate(originalText, senderLanguage, receiverLanguage);
+            senderTranslatedText = translationService.translateToLanguage(originalText, senderLanguage);
         } else {
-            // Same language — deliver original text as-is, no API call
             log.info("No translation needed — both users speak: {}", senderLanguage);
-            translatedText = requestDto.getOriginalText();
-            senderTranslatedText = requestDto.getOriginalText();
+            originalText        = requestDto.getOriginalText();
+            translatedText      = originalText;
+            senderTranslatedText = originalText;
         }
+
+        // ── Encrypt all three plaintext variants ─────────────────────────────
+        if (sender.getPublicKey() == null) {
+            throw new RuntimeException(
+                "Sender has no encryption keypair. Please log out and log back in to generate one.");
+        }
+        if (receiver.getPublicKey() == null) {
+            throw new RuntimeException(
+                "Receiver has no encryption keypair. They must log in once before you can message them.");
+        }
+        PublicKey senderPublicKey   = encryptionService.decodePublicKey(sender.getPublicKey());
+        PublicKey receiverPublicKey = encryptionService.decodePublicKey(receiver.getPublicKey());
+
+        // Fresh AES key per message; separate IV per plaintext field (GCM nonce uniqueness)
+        byte[] aesKey           = encryptionService.generateAesKey();
+        byte[] ivOriginal       = encryptionService.generateAesIv();
+        byte[] ivTranslated     = encryptionService.generateAesIv();
+        byte[] ivSender         = encryptionService.generateAesIv();
+
+        String encOriginal      = encryptionService.aesEncrypt(aesKey, ivOriginal,    originalText);
+        String encTranslated    = encryptionService.aesEncrypt(aesKey, ivTranslated,  translatedText);
+        String encSender        = encryptionService.aesEncrypt(aesKey, ivSender,      senderTranslatedText);
+
+        String wrappedForSender   = encryptionService.rsaEncrypt(senderPublicKey,   aesKey);
+        String wrappedForReceiver = encryptionService.rsaEncrypt(receiverPublicKey, aesKey);
+
+        // Best-effort plaintext zeroing
+        originalText        = null;
+        translatedText      = null;
+        senderTranslatedText = null;
 
         Message message = new Message();
         message.setSender(sender);
         message.setReceiver(receiver);
         message.setOriginalLanguage(senderLanguage);
         message.setTargetLanguage(receiverLanguage);
-        message.setOriginalText(requestDto.getOriginalText());
-        message.setTranslatedText(translatedText);
-        message.setSenderTranslatedText(senderTranslatedText);
+        message.setEncryptedOriginalText(encOriginal);
+        message.setEncryptedTranslatedText(encTranslated);
+        message.setEncryptedSenderText(encSender);
+        message.setAesKeyForSender(wrappedForSender);
+        message.setAesKeyForReceiver(wrappedForReceiver);
+        message.setAesIvOriginal(Base64.getEncoder().encodeToString(ivOriginal));
+        message.setAesIvTranslated(Base64.getEncoder().encodeToString(ivTranslated));
+        message.setAesIvSender(Base64.getEncoder().encodeToString(ivSender));
         message.setTimestamp(LocalDateTime.now());
 
         Message savedMessage = messageRepository.save(message);
-        log.info("Message saved successfully | messageId: {}", savedMessage.getId());
-        return mapToMessageResponseDto(savedMessage);
+        log.info("Message saved (encrypted) | messageId: {}", savedMessage.getId());
+        return mapToDto(savedMessage);
     }
 
-    private MessageResponseDto mapToMessageResponseDto(Message message) {
+    private MessageResponseDto mapToDto(Message message) {
         return new MessageResponseDto(
                 message.getId(),
                 message.getSender().getId(),
-                // message.getSender().getName(),
                 message.getReceiver().getId(),
-                // message.getReceiver().getName(),
-                message.getOriginalText(),
-                message.getTranslatedText(),
-                message.getSenderTranslatedText(),
+                message.getEncryptedOriginalText(),
+                message.getEncryptedTranslatedText(),
+                message.getEncryptedSenderText(),
+                message.getAesKeyForSender(),
+                message.getAesKeyForReceiver(),
+                message.getAesIvOriginal(),
+                message.getAesIvTranslated(),
+                message.getAesIvSender(),
                 message.getOriginalLanguage(),
                 message.getTargetLanguage(),
+                message.isRead(),
                 message.getTimestamp());
     }
 
     public List<MessageResponseDto> getChatHistory(Long user1Id, Long user2Id) {
         return messageRepository.findChatHistory(user1Id, user2Id)
-                .stream().map(this::mapToMessageResponseDto).toList();
+                .stream().map(this::mapToDto).toList();
     }
 
     /**
-     * Returns the conversation list for the sidebar — one entry per unique chat partner,
-     * showing the last message and the other person's info.
-     *
-     * Deduplication: the DB query may return two rows for the same partner (one where
-     * current user was sender, one where receiver). We deduplicate by keeping only the
-     * most recent row per partner using a LinkedHashMap keyed on partner userId.
+     * Returns the conversation list for the sidebar — one entry per unique chat partner.
+     * Preview text is omitted (ciphertext is meaningless); timestamp is shown instead.
      */
     public List<ConversationDto> getConversations(String currentUserEmail) {
         User me = userRepository.findByEmail(currentUserEmail)
@@ -130,7 +158,6 @@ public class MessageService {
 
         List<Message> latestMessages = messageRepository.findLatestMessagePerConversation(me);
 
-        // Deduplicate: keep only the most recent message per conversation partner
         java.util.LinkedHashMap<Long, ConversationDto> byPartner = new java.util.LinkedHashMap<>();
 
         for (Message msg : latestMessages) {
@@ -140,22 +167,17 @@ public class MessageService {
 
             if (byPartner.containsKey(partner.getId())) continue;
 
-            // Show the translated text as preview if available (receiver sees translated)
-            String preview = msg.getTranslatedText() != null
-                    ? msg.getTranslatedText()
-                    : msg.getOriginalText();
-
+            // Preview is unavailable server-side (ciphertext); client should decrypt and display.
             byPartner.put(partner.getId(), new ConversationDto(
                     partner.getId(),
                     partner.getname(),
                     partner.getPictureUrl(),
-                    preview,
+                    null,   // client decrypts preview from the encrypted blob
                     msg.getTimestamp(),
-                    0L   // unread count — placeholder until read receipts are implemented
+                    0L
             ));
         }
 
         return new java.util.ArrayList<>(byPartner.values());
     }
-
 }

@@ -1,6 +1,9 @@
 package com.multilingual.chat.app.service;
 
+import java.security.KeyPair;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -35,6 +38,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
+    private final EncryptionService encryptionService;
 
     @Value("${jwt.refresh-token-expiration}")
     private long refreshTokenExpirationMs;
@@ -46,12 +50,14 @@ public class AuthService {
                        RefreshTokenRepository refreshTokenRepository,
                        JwtService jwtService,
                        PasswordEncoder passwordEncoder,
-                       AuthenticationManager authenticationManager) {
+                       AuthenticationManager authenticationManager,
+                       EncryptionService encryptionService) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
+        this.encryptionService = encryptionService;
     }
 
     // ── Register ──────────────────────────────────────────────────────────────
@@ -72,18 +78,36 @@ public class AuthService {
             throw new RuntimeException("Email already registered: " + request.getEmail());
         }
 
+        // ── Generate RSA keypair and encrypt private key with password-derived key ──
+        byte[] salt = new byte[16];
+        new SecureRandom().nextBytes(salt);
+        byte[] derivedKey = encryptionService.deriveKeyFromPassword(request.getPassword(), salt);
+
+        KeyPair keyPair = encryptionService.generateRsaKeypair();
+        byte[] privateKeyBytes = keyPair.getPrivate().getEncoded();
+
+        // Use the first 12 bytes of the salt as the AES-GCM IV for private key encryption
+        byte[] pkIv = java.util.Arrays.copyOf(salt, 12);
+        String encryptedPrivateKey = encryptionService.aesEncrypt(derivedKey, pkIv,
+                Base64.getEncoder().encodeToString(privateKeyBytes));
+
         User user = new User();
         user.setName(request.getName());
         user.setEmail(request.getEmail());
-        user.setPasswordHash(passwordEncoder.encode(request.getPassword())); // never store plain text
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setPreferredLanguage(request.getPreferredLanguage());
         user.setProvider(AuthProvider.LOCAL);
         user.setVerified(false);
+        user.setPublicKey(encryptionService.encodePublicKey(keyPair.getPublic()));
+        user.setEncryptedPrivateKey(encryptedPrivateKey);
+        user.setKeySalt(Base64.getEncoder().encodeToString(salt));
 
         User savedUser = userRepository.save(user);
         log.info("User registered successfully | userId: {}", savedUser.getId());
 
-        return buildAuthResponse(savedUser);
+        // Return plaintext private key to client — transmitted over TLS, never persisted server-side
+        String plaintextPrivateKey = encryptionService.encodePrivateKey(keyPair.getPrivate());
+        return buildAuthResponse(savedUser, plaintextPrivateKey);
     }
 
     // ── Login ─────────────────────────────────────────────────────────────────
@@ -115,8 +139,39 @@ public class AuthService {
         // Remove this line if you want to support multiple concurrent sessions.
         refreshTokenRepository.deleteAllByUser(user);
 
+        // ── Ensure the user has an RSA keypair (migration path for pre-8.5 accounts) ──
+        // If the user was created before encryption was introduced, generate a keypair now
+        // using their password (which we have in plaintext only at login time).
+        if (user.getPublicKey() == null || user.getEncryptedPrivateKey() == null) {
+            log.info("No keypair found for userId: {} — generating one now (first login after encryption migration)", user.getId());
+            byte[] salt = new byte[16];
+            new SecureRandom().nextBytes(salt);
+            byte[] derivedKey = encryptionService.deriveKeyFromPassword(request.getPassword(), salt);
+            KeyPair keyPair = encryptionService.generateRsaKeypair();
+            byte[] pkIv = java.util.Arrays.copyOf(salt, 12);
+            String encryptedPrivateKey = encryptionService.aesEncrypt(derivedKey, pkIv,
+                    Base64.getEncoder().encodeToString(keyPair.getPrivate().getEncoded()));
+            user.setPublicKey(encryptionService.encodePublicKey(keyPair.getPublic()));
+            user.setEncryptedPrivateKey(encryptedPrivateKey);
+            user.setKeySalt(Base64.getEncoder().encodeToString(salt));
+            user = userRepository.save(user);
+            log.info("Keypair generated and stored for userId: {}", user.getId());
+        }
+
+        // ── Decrypt and return the user's RSA private key ─────────────────────
+        String plaintextPrivateKey = null;
+        byte[] salt = Base64.getDecoder().decode(user.getKeySalt());
+        byte[] derivedKey = encryptionService.deriveKeyFromPassword(request.getPassword(), salt);
+        byte[] pkIv = java.util.Arrays.copyOf(salt, 12);
+        try {
+            plaintextPrivateKey = encryptionService.aesDecrypt(derivedKey, pkIv, user.getEncryptedPrivateKey());
+        } catch (RuntimeException e) {
+            log.error("Failed to decrypt private key for userId: {} — tampered key", user.getId());
+            throw new RuntimeException("Authentication error: could not unlock encryption key");
+        }
+
         log.info("Login successful | userId: {}", user.getId());
-        return buildAuthResponse(user);
+        return buildAuthResponse(user, plaintextPrivateKey);
     }
 
     // ── Google OAuth2 Login ───────────────────────────────────────────────────
@@ -213,7 +268,38 @@ public class AuthService {
         // Revoke existing refresh tokens (same single-session policy as password login)
         refreshTokenRepository.deleteAllByUser(user);
 
-        return buildAuthResponse(user);
+        // ── Ensure keypair exists for this Google user ────────────────────────
+        // Google users have no password, so we use their immutable Google sub ID as the
+        // PBKDF2 "password". The sub never changes, so the derived key is stable across logins.
+        // Trust boundary: same as overall — server briefly holds plaintext during translation.
+        final String effectiveGoogleId = googleId != null ? googleId : user.getGoogleId();
+        if (user.getPublicKey() == null || user.getEncryptedPrivateKey() == null) {
+            log.info("Generating keypair for Google user | userId: {}", user.getId());
+            byte[] salt = new byte[16];
+            new SecureRandom().nextBytes(salt);
+            byte[] derivedKey = encryptionService.deriveKeyFromPassword(effectiveGoogleId, salt);
+            KeyPair keyPair = encryptionService.generateRsaKeypair();
+            byte[] pkIv = java.util.Arrays.copyOf(salt, 12);
+            String encryptedPrivateKey = encryptionService.aesEncrypt(derivedKey, pkIv,
+                    Base64.getEncoder().encodeToString(keyPair.getPrivate().getEncoded()));
+            user.setPublicKey(encryptionService.encodePublicKey(keyPair.getPublic()));
+            user.setEncryptedPrivateKey(encryptedPrivateKey);
+            user.setKeySalt(Base64.getEncoder().encodeToString(salt));
+            user = userRepository.save(user);
+        }
+
+        // Decrypt and return the private key using the Google sub as the derivation password
+        String plaintextPrivateKey = null;
+        try {
+            byte[] salt = Base64.getDecoder().decode(user.getKeySalt());
+            byte[] derivedKey = encryptionService.deriveKeyFromPassword(effectiveGoogleId, salt);
+            byte[] pkIv = java.util.Arrays.copyOf(salt, 12);
+            plaintextPrivateKey = encryptionService.aesDecrypt(derivedKey, pkIv, user.getEncryptedPrivateKey());
+        } catch (RuntimeException e) {
+            log.error("Failed to decrypt private key for Google userId: {}", user.getId());
+        }
+
+        return buildAuthResponse(user, plaintextPrivateKey);
     }
 
     // ── Refresh ───────────────────────────────────────────────────────────────
@@ -246,6 +332,7 @@ public class AuthService {
         String newAccessToken = jwtService.generateAccessToken(user.getemail());
         log.info("Access token refreshed for userId: {}", user.getId());
 
+        // Refresh does not re-issue the private key — client must re-login to obtain it.
         return new AuthResponseDto(newAccessToken, refreshTokenString, user.getId(), user.getemail(), user.getname());
     }
 
@@ -278,10 +365,10 @@ public class AuthService {
      * Generates both tokens and packages them with user info into the response.
      * Called after both register and login.
      */
-    private AuthResponseDto buildAuthResponse(User user) {
+    private AuthResponseDto buildAuthResponse(User user, String plaintextPrivateKey) {
         String accessToken  = jwtService.generateAccessToken(user.getemail());
         String refreshToken = createAndSaveRefreshToken(user);
-        return new AuthResponseDto(accessToken, refreshToken, user.getId(), user.getemail(), user.getname());
+        return new AuthResponseDto(accessToken, refreshToken, user.getId(), user.getemail(), user.getname(), plaintextPrivateKey);
     }
 
     /**

@@ -3,9 +3,11 @@ package com.multilingual.chat.app.repository;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.multilingual.chat.app.entity.Message;
 import com.multilingual.chat.app.entity.User;
@@ -49,5 +51,10 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
             WHERE sender_id = :userId OR receiver_id = :userId
             """, nativeQuery = true)
     List<Long> findConversationPartnerIds(@Param("userId") Long userId);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE Message m SET m.isRead = true WHERE m.sender.id = :senderId AND m.receiver.id = :receiverId AND m.isRead = false")
+    int markMessagesAsRead(@Param("senderId") Long senderId, @Param("receiverId") Long receiverId);
 
 }
