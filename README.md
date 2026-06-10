@@ -291,6 +291,55 @@ Sessions require server-side state — a scaling problem. JWT is stateless: ever
 
 ---
 
+## 🔐 Security Model
+
+### Encryption at rest (Phase 8.5)
+
+| Property | Detail |
+|---|---|
+| Message encryption | AES-256-GCM per message, fresh key + unique IV per plaintext field |
+| Key wrapping | RSA-2048-OAEP (SHA-256) — AES key wrapped separately for sender and receiver |
+| Private key storage | PKCS#8 private key encrypted with AES-256-GCM; key derived via PBKDF2-HMAC-SHA256 (100,000 iterations) from user password |
+| Key transport | Plaintext private key returned to client on login/register over TLS; never persisted server-side |
+
+### Trust boundary (honest documentation)
+
+> **This is NOT end-to-end encryption.**
+
+The server briefly holds plaintext message content in memory during the OpenAI translation step. Plaintext is never written to disk or logs, and variables are nulled after use — but an attacker with live memory access to the server process could read it.
+
+**What the encryption protects against:** a database dump contains only ciphertext. Without the user's password (and thus their derived key), encrypted messages and private keys are computationally infeasible to read.
+
+**What it does NOT protect against:** a compromised server process, a malicious server operator, or network interception without TLS.
+
+### Key loss
+
+Password loss = permanent message loss. There is no key recovery mechanism — storing a recovery key server-side would defeat the purpose of the encryption. Users must keep their password safe.
+
+---
+
+## 🚀 Deployment Guide
+
+### One-time manual DB migration (Phase 8.5 encryption)
+
+Hibernate's `ddl-auto=update` automatically **adds** new columns on startup, but it **never drops** old ones. The encryption migration replaced `original_text`, `translated_text`, and `sender_translated_text` with encrypted equivalents. If those old columns still exist in your production DB (i.e. you're deploying from a pre-encryption version), the server will throw a `NOT NULL` constraint violation on every message insert.
+
+**Run this once against your production DB before starting the server:**
+
+```sql
+ALTER TABLE messages DROP COLUMN IF EXISTS original_text;
+ALTER TABLE messages DROP COLUMN IF EXISTS translated_text;
+ALTER TABLE messages DROP COLUMN IF EXISTS sender_translated_text;
+```
+
+The new encrypted columns (`encrypted_original_text`, `encrypted_translated_text`, etc.) are added automatically by Hibernate on first startup — no action needed for those.
+
+### First login after encryption deploy
+
+RSA keypairs are generated per-user **at login time** (the only moment the server has the plaintext password to derive the key-encryption key). After deploying the encryption update, every existing user must **log in once** with the new server before they can send or receive messages. Until they do, their `public_key` column will be null and message sends will be blocked with a clear error.
+
+---
+
 ## 🗺️ Roadmap
 
 - [x] User management — CRUD, preferred language
@@ -302,6 +351,7 @@ Sessions require server-side state — a scaling problem. JWT is stateless: ever
 - [x] Language preference system — server derives languages from profiles, smart OpenAI cost control
 - [x] React + Tailwind frontend — login, sidebar, chat window, new chat modal
 - [x] Conversation list API
+- [x] Encryption at rest — AES-256-GCM + RSA-2048, per-user keypairs, PBKDF2 key derivation
 - [ ] Typing indicators over WebSocket
 - [ ] Message read receipts
 - [ ] User profile / settings page (change language, display name)
