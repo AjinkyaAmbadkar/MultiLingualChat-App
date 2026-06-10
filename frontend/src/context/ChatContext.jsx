@@ -17,6 +17,13 @@ export function ChatProvider({ children }) {
     setOnlineUsers(prev => ({ ...prev, [userId]: online }))
   }, [])
 
+  // Mark all messages from senderId as read in local state
+  const markMessagesRead = useCallback((senderId) => {
+    setMessages(prev => prev.map(m =>
+      String(m.senderId) === String(senderId) ? { ...m, isRead: true } : m
+    ))
+  }, [])
+
   // Called by useWebSocket when a new message arrives over STOMP
   const addMessage = useCallback((msg) => {
     setMessages(prev => {
@@ -43,6 +50,7 @@ export function ChatProvider({ children }) {
       addMessage,
       typingUsers, setTyping,
       onlineUsers, setPresence,
+      markMessagesRead,
     }}>
       {children}
     </ChatContext.Provider>

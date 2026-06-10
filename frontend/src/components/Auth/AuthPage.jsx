@@ -107,7 +107,11 @@ export default function AuthPage() {
 
   async function handleSignIn(res) {
     const me = await getMe(res.accessToken)
-    signIn(res.accessToken, { id: me.id, name: me.name, email: me.email, pictureUrl: me.pictureUrl, preferredLanguage: me.preferredLanguage })
+    await signIn(
+      res.accessToken,
+      { id: me.id, name: me.name, email: me.email, pictureUrl: me.pictureUrl, preferredLanguage: me.preferredLanguage },
+      res.privateKey   // Base64 PKCS#8 — imported into memory, never stored
+    )
   }
 
   async function handleLogin(e) {

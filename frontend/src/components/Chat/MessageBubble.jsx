@@ -53,7 +53,11 @@ export default function MessageBubble({ message, isSent }) {
             {time}
           </span>
           {isSent && (
-            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)' }}>✓✓</span>
+            <span style={{
+              fontSize: '11px',
+              color: message.isRead ? '#4ade80' : 'rgba(255,255,255,0.5)',
+              fontWeight: message.isRead ? 700 : 400,
+            }}>✓✓</span>
           )}
         </div>
       </div>

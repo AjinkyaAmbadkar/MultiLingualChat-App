@@ -1,4 +1,5 @@
 import { createContext, useContext, useState } from 'react'
+import { importPrivateKey } from '../utils/crypto'
 
 const AuthContext = createContext(null)
 
@@ -15,10 +16,22 @@ export function AuthProvider({ children }) {
     }
   })
 
-  function signIn(token, user) {
+  // RSA private key stored in memory only — never written to localStorage
+  const [privateKey, setPrivateKey] = useState(null)
+
+  async function signIn(token, user, rawPrivateKeyB64) {
     localStorage.setItem('accessToken', token)
     localStorage.setItem('user', JSON.stringify(user))
     setAuth({ token, user })
+
+    if (rawPrivateKeyB64) {
+      try {
+        const key = await importPrivateKey(rawPrivateKeyB64)
+        setPrivateKey(key)
+      } catch (err) {
+        console.error('Failed to import private key:', err)
+      }
+    }
   }
 
   function updateUser(updatedFields) {
@@ -31,10 +44,11 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('accessToken')
     localStorage.removeItem('user')
     setAuth(null)
+    setPrivateKey(null)
   }
 
   return (
-    <AuthContext.Provider value={{ auth, signIn, signOut, updateUser }}>
+    <AuthContext.Provider value={{ auth, privateKey, signIn, signOut, updateUser }}>
       {children}
     </AuthContext.Provider>
   )

@@ -1,18 +1,27 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useChat } from '../../context/ChatContext'
-import { useCallback } from 'react'
+import { fetchOnlineStatus } from '../../api/users'
 import { getChatHistory } from '../../api/messages'
+import { decryptMessage } from '../../utils/crypto'
 import { Avatar } from '../Sidebar/ConversationItem'
 import MessageBubble from './MessageBubble'
 import MessageInput from './MessageInput'
 
-export default function ChatWindow({ sendMessage, sendTyping }) {
-  const { auth }                                                      = useAuth()
-  const { activeConversation, messages, setMessages, typingUsers, onlineUsers } = useChat()
+export default function ChatWindow({ sendMessage, sendTyping, sendReadReceipt }) {
+  const { auth, privateKey }                                          = useAuth()
+  const { activeConversation, messages, setMessages, typingUsers, onlineUsers, setPresence } = useChat()
 
   const isPartnerTyping = activeConversation && typingUsers[activeConversation.userId]
   const isPartnerOnline = activeConversation && onlineUsers[activeConversation.userId]
+
+  // Fetch accurate online status via REST whenever the active conversation changes
+  useEffect(() => {
+    if (!activeConversation) return
+    fetchOnlineStatus(auth.token, activeConversation.userId)
+      .then(online => setPresence(activeConversation.userId, online))
+      .catch(() => {})
+  }, [activeConversation?.userId])
 
   const handleTyping = useCallback((isTyping) => {
     if (activeConversation) sendTyping(activeConversation.userId, isTyping)
@@ -23,7 +32,14 @@ export default function ChatWindow({ sendMessage, sendTyping }) {
     if (!activeConversation) return
     setMessages([])
     getChatHistory(auth.token, auth.user.id, activeConversation.userId)
-      .then(setMessages).catch(console.error)
+      .then(async msgs => {
+        const decrypted = await Promise.all(
+          msgs.map(m => decryptMessage(m, privateKey, auth.user.id))
+        )
+        setMessages(decrypted)
+        sendReadReceipt(activeConversation.userId)
+      })
+      .catch(console.error)
   }, [activeConversation?.userId])
 
   useEffect(() => {

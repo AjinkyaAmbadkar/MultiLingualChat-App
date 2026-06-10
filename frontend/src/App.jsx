@@ -1,23 +1,31 @@
-import { useEffect } from 'react'
+import { useEffect, useCallback } from 'react'
 import { useAuth } from './context/AuthContext'
 import { useChat } from './context/ChatContext'
 import { useWebSocket } from './hooks/useWebSocket'
 import { getConversations } from './api/messages'
+import { decryptMessage } from './utils/crypto'
 import AuthPage from './components/Auth/AuthPage'
 import Sidebar from './components/Sidebar/Sidebar'
 import ChatWindow from './components/Chat/ChatWindow'
 
 export default function App() {
-  const { auth }                         = useAuth()
-  const { setConversations, addMessage, setTyping, setPresence } = useChat()
+  const { auth, privateKey }             = useAuth()
+  const { setConversations, addMessage, setTyping, setPresence, markMessagesRead } = useChat()
+
+  // Decrypt then add — keeps MessageBubble unaware of encryption
+  const onMessage = useCallback(async (msg) => {
+    const decrypted = await decryptMessage(msg, privateKey, auth?.user?.id)
+    addMessage(decrypted)
+  }, [privateKey, auth?.user?.id, addMessage])
 
   // WebSocket — connects only when logged in
-  const { sendMessage, sendTyping } = useWebSocket({
-    token:      auth?.token,
-    userId:     auth?.user?.id,
-    onMessage:  addMessage,
-    onTyping:   (event) => setTyping(event.senderId, event.typing),
-    onPresence: (event) => setPresence(event.userId, event.online),
+  const { sendMessage, sendTyping, sendReadReceipt } = useWebSocket({
+    token:           auth?.token,
+    userId:          auth?.user?.id,
+    onMessage,
+    onTyping:        (event) => setTyping(event.senderId, event.typing),
+    onPresence:      (event) => setPresence(event.userId, event.online),
+    onReadReceipt:   (event) => markMessagesRead(event.senderId),
   })
 
   // Load conversation list on login
@@ -33,7 +41,7 @@ export default function App() {
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden">
       <Sidebar />
-      <ChatWindow sendMessage={sendMessage} sendTyping={sendTyping} />
+      <ChatWindow sendMessage={sendMessage} sendTyping={sendTyping} sendReadReceipt={sendReadReceipt} />
     </div>
   )
 }
