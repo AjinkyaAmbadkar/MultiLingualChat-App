@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
 import { importPrivateKey } from '../utils/crypto'
 
 const AuthContext = createContext(null)
@@ -16,8 +16,29 @@ export function AuthProvider({ children }) {
     }
   })
 
-  // RSA private key stored in memory only — never written to localStorage
+  // RSA private key: imported into memory, raw key kept in sessionStorage to survive page refresh
   const [privateKey, setPrivateKey] = useState(null)
+
+  // On mount, re-import the private key from sessionStorage if present (page refresh case).
+  // If auth exists but no key in sessionStorage, clear the session — user must log in again to get their key.
+  useEffect(() => {
+    const raw = sessionStorage.getItem('privateKey')
+    if (raw) {
+      importPrivateKey(raw)
+        .then(setPrivateKey)
+        .catch(() => {
+          sessionStorage.removeItem('privateKey')
+          localStorage.removeItem('accessToken')
+          localStorage.removeItem('user')
+          setAuth(null)
+        })
+    } else if (auth) {
+      // Session token exists but private key is gone — can't decrypt anything, force re-login
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('user')
+      setAuth(null)
+    }
+  }, [])
 
   async function signIn(token, user, rawPrivateKeyB64) {
     localStorage.setItem('accessToken', token)
@@ -28,6 +49,7 @@ export function AuthProvider({ children }) {
       try {
         const key = await importPrivateKey(rawPrivateKeyB64)
         setPrivateKey(key)
+        sessionStorage.setItem('privateKey', rawPrivateKeyB64)
       } catch (err) {
         console.error('Failed to import private key:', err)
       }
@@ -43,6 +65,7 @@ export function AuthProvider({ children }) {
   function signOut() {
     localStorage.removeItem('accessToken')
     localStorage.removeItem('user')
+    sessionStorage.removeItem('privateKey')
     setAuth(null)
     setPrivateKey(null)
   }

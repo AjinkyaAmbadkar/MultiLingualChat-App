@@ -237,14 +237,33 @@ export default function AuthPage() {
 
 function Field({ label, type = 'text', value, onChange, placeholder }) {
   const [focused, setFocused] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const isPassword = type === 'password'
+  const inputType = isPassword ? (showPassword ? 'text' : 'password') : type
   return (
     <div style={S.field}>
       <label style={S.label}>{label}</label>
-      <input type={type} value={value} placeholder={placeholder} required
-        onChange={e => onChange(e.target.value)}
-        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-        style={S.input(focused)}
-      />
+      <div style={{ position: 'relative' }}>
+        <input type={inputType} value={value} placeholder={placeholder} required
+          onChange={e => onChange(e.target.value)}
+          onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+          style={{ ...S.input(focused), paddingRight: isPassword ? '42px' : '14px' }}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShowPassword(v => !v)}
+            style={{
+              position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+              background: 'none', border: 'none', cursor: 'pointer', padding: '2px',
+              color: '#94a3b8', fontSize: '16px', lineHeight: 1,
+            }}
+            tabIndex={-1}
+          >
+            {showPassword ? '🙈' : '👁️'}
+          </button>
+        )}
+      </div>
     </div>
   )
 }

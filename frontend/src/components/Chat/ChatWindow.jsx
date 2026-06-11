@@ -29,7 +29,7 @@ export default function ChatWindow({ sendMessage, sendTyping, sendReadReceipt })
   const bottomRef                                     = useRef(null)
 
   useEffect(() => {
-    if (!activeConversation) return
+    if (!activeConversation || !privateKey) return
     setMessages([])
     getChatHistory(auth.token, auth.user.id, activeConversation.userId)
       .then(async msgs => {
@@ -40,7 +40,7 @@ export default function ChatWindow({ sendMessage, sendTyping, sendReadReceipt })
         sendReadReceipt(activeConversation.userId)
       })
       .catch(console.error)
-  }, [activeConversation?.userId])
+  }, [activeConversation?.userId, privateKey])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })

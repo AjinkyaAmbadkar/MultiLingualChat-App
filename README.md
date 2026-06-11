@@ -9,26 +9,28 @@ A real-time chat application that breaks the language barrier — like WhatsApp,
 ## 🛠️ Tech Stack
 
 ### Backend
-| Layer | Technology |
-|---|---|
-| Language | Java 21 |
-| Framework | Spring Boot 4.x (Spring Framework 7.x) |
-| Database | PostgreSQL |
-| ORM | Spring Data JPA / Hibernate 7 |
-| Real-time | WebSocket + STOMP protocol (via SockJS) |
-| Translation | OpenAI GPT-4o-mini (Chat Completions API) |
-| HTTP Client | Spring `RestClient` (Spring 6.1+) |
-| Security | Spring Security 7 + JWT (JJWT 0.12.x) |
-| OAuth2 | Google Identity Services (frontend-initiated flow) |
-| Logging | SLF4J + Logback |
-| Build | Maven |
+
+| Layer       | Technology                                         |
+| ----------- | -------------------------------------------------- |
+| Language    | Java 21                                            |
+| Framework   | Spring Boot 4.x (Spring Framework 7.x)             |
+| Database    | PostgreSQL                                         |
+| ORM         | Spring Data JPA / Hibernate 7                      |
+| Real-time   | WebSocket + STOMP protocol (via SockJS)            |
+| Translation | OpenAI GPT-4o-mini (Chat Completions API)          |
+| HTTP Client | Spring `RestClient` (Spring 6.1+)                  |
+| Security    | Spring Security 7 + JWT (JJWT 0.12.x)              |
+| OAuth2      | Google Identity Services (frontend-initiated flow) |
+| Logging     | SLF4J + Logback                                    |
+| Build       | Maven                                              |
 
 ### Frontend
-| Layer | Technology |
-|---|---|
-| Framework | React 19 (Vite) |
-| Styling | Tailwind CSS v4 + inline styles |
-| WebSocket | STOMP.js + SockJS client |
+
+| Layer     | Technology                      |
+| --------- | ------------------------------- |
+| Framework | React 19 (Vite)                 |
+| Styling   | Tailwind CSS v4 + inline styles |
+| WebSocket | STOMP.js + SockJS client        |
 
 ---
 
@@ -121,6 +123,7 @@ MutiLingual Chat App/
 ## ⚙️ Setup & Running
 
 ### Prerequisites
+
 - Java 21+
 - Maven
 - PostgreSQL running locally
@@ -129,20 +132,24 @@ MutiLingual Chat App/
 - Node.js 18+ (for frontend)
 
 ### 1. Database setup
+
 ```sql
 CREATE USER chatapp_user WITH PASSWORD 'your-password';
 CREATE DATABASE chatapp OWNER chatapp_user;
 GRANT ALL PRIVILEGES ON DATABASE chatapp TO chatapp_user;
 GRANT ALL ON SCHEMA public TO chatapp_user;
 ```
+
 Hibernate auto-creates all tables on first run via `ddl-auto=update`.
 
 ### 2. Create `.env` file
+
 ```bash
 cd backend/chat-app
 ```
 
 `backend/chat-app/.env`:
+
 ```
 JWT_SECRET=<run: openssl rand -base64 32>
 OPENAI_API_KEY=sk-your-openai-key-here
@@ -153,24 +160,29 @@ GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 > `.env` is in `.gitignore` and will never be committed.
 
 ### 3. Google Cloud setup
+
 1. Go to [Google Cloud Console](https://console.cloud.google.com) → APIs & Services → Credentials
 2. Create an OAuth 2.0 Client ID (Web application type)
 3. Add `http://localhost:3000` to **Authorized JavaScript origins**
 4. Copy the Client ID into `.env` and into `frontend/src/components/Auth/AuthPage.jsx`
 
 ### 4. Start the backend
+
 ```bash
 cd backend/chat-app
 source .env && ./mvnw spring-boot:run
 ```
+
 Backend starts at `http://localhost:8080`
 
 ### 5. Start the frontend
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+
 Frontend starts at `http://localhost:3000`
 
 ---
@@ -178,6 +190,7 @@ Frontend starts at `http://localhost:3000`
 ## 🔐 Authentication
 
 ### Email / Password
+
 ```
 POST /auth/register  →  hash password → save user → issue JWT pair
 POST /auth/login     →  verify credentials → issue JWT pair
@@ -186,6 +199,7 @@ POST /auth/logout    →  revoke refresh token in DB
 ```
 
 ### Google OAuth2 (frontend-initiated)
+
 ```
 Browser → Google Identity Services JS SDK → Google ID Token
        → POST /auth/google { idToken }
@@ -196,6 +210,7 @@ Browser → Google Identity Services JS SDK → Google ID Token
 ```
 
 **Token lifetimes:**
+
 - Access token: **15 minutes** (stateless, cannot be revoked)
 - Refresh token: **7 days** (stored in DB, revoked on logout)
 
@@ -235,40 +250,40 @@ MessageService.sendMessage(dto, senderEmail)
 
 ### Auth (public)
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+| Method | Endpoint         | Description                    |
+| ------ | ---------------- | ------------------------------ |
 | `POST` | `/auth/register` | Register with email + password |
-| `POST` | `/auth/login` | Login → returns JWT pair |
-| `POST` | `/auth/google` | Login with Google ID token |
-| `POST` | `/auth/refresh` | Get new access token |
-| `POST` | `/auth/logout` | Revoke refresh token |
+| `POST` | `/auth/login`    | Login → returns JWT pair       |
+| `POST` | `/auth/google`   | Login with Google ID token     |
+| `POST` | `/auth/refresh`  | Get new access token           |
+| `POST` | `/auth/logout`   | Revoke refresh token           |
 
 ### Users (require Bearer token)
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/users` | List all users (safe — no passwords) |
-| `GET` | `/api/users/{id}` | Get user by ID |
-| `GET` | `/api/users/me` | Get current user's profile |
-| `PATCH` | `/api/users/me/language` | Update preferred language |
+| Method  | Endpoint                 | Description                          |
+| ------- | ------------------------ | ------------------------------------ |
+| `GET`   | `/api/users`             | List all users (safe — no passwords) |
+| `GET`   | `/api/users/{id}`        | Get user by ID                       |
+| `GET`   | `/api/users/me`          | Get current user's profile           |
+| `PATCH` | `/api/users/me/language` | Update preferred language            |
 
 ### Messages (require Bearer token)
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/messages/send` | Send a message (REST) |
-| `GET` | `/api/messages/history?user1Id=&user2Id=` | Chat history |
-| `GET` | `/api/messages/conversations` | Sidebar conversation list |
+| Method | Endpoint                                  | Description               |
+| ------ | ----------------------------------------- | ------------------------- |
+| `POST` | `/api/messages/send`                      | Send a message (REST)     |
+| `GET`  | `/api/messages/history?user1Id=&user2Id=` | Chat history              |
+| `GET`  | `/api/messages/conversations`             | Sidebar conversation list |
 
 ### WebSocket (STOMP)
 
 **Connect:** `ws://localhost:8080/ws` (SockJS)
 Pass JWT in STOMP CONNECT headers: `Authorization: Bearer <token>`
 
-| Direction | Destination | Purpose |
-|---|---|---|
-| Client → Server | `/app/chat.send` | Send `{ receiverId, originalText }` |
-| Server → Client | `/topic/user.{userId}` | Receive `MessageResponseDto` |
+| Direction       | Destination            | Purpose                             |
+| --------------- | ---------------------- | ----------------------------------- |
+| Client → Server | `/app/chat.send`       | Send `{ receiverId, originalText }` |
+| Server → Client | `/topic/user.{userId}` | Receive `MessageResponseDto`        |
 
 ---
 
@@ -295,12 +310,12 @@ Sessions require server-side state — a scaling problem. JWT is stateless: ever
 
 ### Encryption at rest (Phase 8.5)
 
-| Property | Detail |
-|---|---|
-| Message encryption | AES-256-GCM per message, fresh key + unique IV per plaintext field |
-| Key wrapping | RSA-2048-OAEP (SHA-256) — AES key wrapped separately for sender and receiver |
+| Property            | Detail                                                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Message encryption  | AES-256-GCM per message, fresh key + unique IV per plaintext field                                                        |
+| Key wrapping        | RSA-2048-OAEP (SHA-256) — AES key wrapped separately for sender and receiver                                              |
 | Private key storage | PKCS#8 private key encrypted with AES-256-GCM; key derived via PBKDF2-HMAC-SHA256 (100,000 iterations) from user password |
-| Key transport | Plaintext private key returned to client on login/register over TLS; never persisted server-side |
+| Key transport       | Plaintext private key returned to client on login/register over TLS; never persisted server-side                          |
 
 ### Trust boundary (honest documentation)
 
@@ -315,28 +330,6 @@ The server briefly holds plaintext message content in memory during the OpenAI t
 ### Key loss
 
 Password loss = permanent message loss. There is no key recovery mechanism — storing a recovery key server-side would defeat the purpose of the encryption. Users must keep their password safe.
-
----
-
-## 🚀 Deployment Guide
-
-### One-time manual DB migration (Phase 8.5 encryption)
-
-Hibernate's `ddl-auto=update` automatically **adds** new columns on startup, but it **never drops** old ones. The encryption migration replaced `original_text`, `translated_text`, and `sender_translated_text` with encrypted equivalents. If those old columns still exist in your production DB (i.e. you're deploying from a pre-encryption version), the server will throw a `NOT NULL` constraint violation on every message insert.
-
-**Run this once against your production DB before starting the server:**
-
-```sql
-ALTER TABLE messages DROP COLUMN IF EXISTS original_text;
-ALTER TABLE messages DROP COLUMN IF EXISTS translated_text;
-ALTER TABLE messages DROP COLUMN IF EXISTS sender_translated_text;
-```
-
-The new encrypted columns (`encrypted_original_text`, `encrypted_translated_text`, etc.) are added automatically by Hibernate on first startup — no action needed for those.
-
-### First login after encryption deploy
-
-RSA keypairs are generated per-user **at login time** (the only moment the server has the plaintext password to derive the key-encryption key). After deploying the encryption update, every existing user must **log in once** with the new server before they can send or receive messages. Until they do, their `public_key` column will be null and message sends will be blocked with a clear error.
 
 ---
 
@@ -363,4 +356,4 @@ RSA keypairs are generated per-user **at login time** (the only moment the serve
 
 ## 👨‍💻 Developer
 
-**Ajinkya Ambadkar** — Built during Masters (2024–) to stay sharp with Java + Spring Boot while exploring real-time systems and LLM integration.
+**Ajinkya Ambadkar** — Built during Masters (2026) to stay sharp with Java + Spring Boot while exploring real-time systems and LLM integration.

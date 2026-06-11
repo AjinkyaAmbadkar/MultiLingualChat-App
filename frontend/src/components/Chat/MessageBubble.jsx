@@ -7,14 +7,13 @@ export default function MessageBubble({ message, isSent }) {
     ? new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : ''
 
-  // For sent messages: show senderTranslatedText (user's preferred language).
-  // For received messages: show translatedText (also user's preferred language).
-  // Toggle reveals originalText (what was literally typed).
+  // Sender always sees what they typed. Receiver sees the translated version.
+  // Toggle reveals the other side's text.
   const preferredText = isSent
-    ? (message.senderTranslatedText || message.originalText)
+    ? message.originalText
     : (message.translatedText || message.originalText)
 
-  const hasOriginal = message.originalText && message.originalText !== preferredText
+  const hasOriginal = !isSent && message.originalText && message.originalText !== preferredText
   const displayText = showOriginal ? message.originalText : preferredText
 
   return (

@@ -62,16 +62,16 @@ public class MessageService {
         String translatedText;
         String senderTranslatedText;
 
+        originalText = requestDto.getOriginalText();
+        // Sender always sees what they typed — no need to call OpenAI for senderTranslatedText
+        senderTranslatedText = originalText;
+
         if (translationService.isTranslationRequired(senderLanguage, receiverLanguage)) {
             log.info("Translation required | {} → {}", senderLanguage, receiverLanguage);
-            originalText        = requestDto.getOriginalText();
-            translatedText      = translationService.translate(originalText, senderLanguage, receiverLanguage);
-            senderTranslatedText = translationService.translateToLanguage(originalText, senderLanguage);
+            translatedText = translationService.translate(originalText, senderLanguage, receiverLanguage);
         } else {
             log.info("No translation needed — both users speak: {}", senderLanguage);
-            originalText        = requestDto.getOriginalText();
-            translatedText      = originalText;
-            senderTranslatedText = originalText;
+            translatedText = originalText;
         }
 
         // ── Encrypt all three plaintext variants ─────────────────────────────

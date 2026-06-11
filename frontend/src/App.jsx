@@ -15,7 +15,7 @@ export default function App() {
   // Decrypt then add — keeps MessageBubble unaware of encryption
   const onMessage = useCallback(async (msg) => {
     const decrypted = await decryptMessage(msg, privateKey, auth?.user?.id)
-    addMessage(decrypted)
+    addMessage(decrypted, auth?.user?.id)
   }, [privateKey, auth?.user?.id, addMessage])
 
   // WebSocket — connects only when logged in

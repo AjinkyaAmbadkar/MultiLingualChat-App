@@ -108,6 +108,7 @@ export default function Sidebar() {
             conversation={c}
             isActive={activeConversation?.userId === c.userId}
             onClick={() => {
+              if (activeConversation?.userId === c.userId) return
               setActiveConversation({ userId: c.userId, name: c.name, pictureUrl: c.pictureUrl })
               setMessages([])
             }}

@@ -25,12 +25,16 @@ export function ChatProvider({ children }) {
   }, [])
 
   // Called by useWebSocket when a new message arrives over STOMP
-  const addMessage = useCallback((msg) => {
+  const addMessage = useCallback((msg, myId) => {
     setMessages(prev => {
-      // Avoid duplicates (echo from server may arrive twice in some edge cases)
       if (prev.some(m => m.id === msg.id)) return prev
       return [...prev, msg]
     })
+
+    // Show preview in the current user's language
+    const previewText = String(msg.senderId) === String(myId)
+      ? msg.originalText
+      : (msg.translatedText || msg.originalText)
 
     // Update the conversation list preview with the latest message
     setConversations(prev => prev.map(c => {
@@ -38,7 +42,7 @@ export function ChatProvider({ children }) {
         String(c.userId) === String(msg.senderId) ||
         String(c.userId) === String(msg.receiverId)
       if (!isThisConversation) return c
-      return { ...c, lastMessage: msg.translatedText || msg.originalText, lastMessageTime: msg.timestamp }
+      return { ...c, lastMessage: previewText, lastMessageTime: msg.timestamp }
     }))
   }, [])
 
