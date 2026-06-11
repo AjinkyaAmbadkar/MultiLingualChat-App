@@ -65,6 +65,10 @@ public class Message {
     @Column(name = "is_read", nullable = false)
     private boolean isRead = false;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private MessageStatus status = MessageStatus.PENDING;
+
     @Column(name = "timestamp", nullable = false)
     private LocalDateTime timestamp;
 
@@ -181,6 +185,14 @@ public class Message {
 
     public void setRead(boolean isRead) {
         this.isRead = isRead;
+    }
+
+    public MessageStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(MessageStatus status) {
+        this.status = status;
     }
 
     public LocalDateTime getTimestamp() {

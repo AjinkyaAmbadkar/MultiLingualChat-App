@@ -42,6 +42,17 @@ export default function ChatWindow({ sendMessage, sendTyping, sendReadReceipt })
       .catch(console.error)
   }, [activeConversation?.userId, privateKey])
 
+  // Auto-send read receipt when new messages arrive from the partner while the chat is open.
+  // sendReadReceipt in the history-load effect only fires when activeConversation changes;
+  // this covers the case where the receiver is already in the conversation.
+  useEffect(() => {
+    if (!activeConversation || !messages.length) return
+    const lastMsg = messages[messages.length - 1]
+    if (String(lastMsg.senderId) === String(activeConversation.userId)) {
+      sendReadReceipt(activeConversation.userId)
+    }
+  }, [messages])
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])

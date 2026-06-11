@@ -27,7 +27,13 @@ export function ChatProvider({ children }) {
   // Called by useWebSocket when a new message arrives over STOMP
   const addMessage = useCallback((msg, myId) => {
     setMessages(prev => {
-      if (prev.some(m => m.id === msg.id)) return prev
+      const existingIndex = prev.findIndex(m => m.id === msg.id)
+      if (existingIndex !== -1) {
+        // Replace with updated version (e.g. Kafka consumer delivered translated message)
+        const next = [...prev]
+        next[existingIndex] = msg
+        return next
+      }
       return [...prev, msg]
     })
 

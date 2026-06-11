@@ -1,5 +1,30 @@
 services:
 
+  kafka:
+    image: confluentinc/cp-kafka:7.7.0
+    restart: unless-stopped
+    environment:
+      # KRaft mode — no ZooKeeper needed
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -22,6 +47,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL:      jdbc:postgresql://postgres:5432/chatapp
       SPRING_DATASOURCE_USERNAME: chatapp_user
@@ -29,6 +56,7 @@ services:
       OPENAI_API_KEY:             ${OPENAI_API_KEY}
       GOOGLE_CLIENT_ID:           ${GOOGLE_CLIENT_ID}
       JWT_SECRET:                 ${JWT_SECRET}
+      KAFKA_BOOTSTRAP_SERVERS:    kafka:9092
     expose:
       - "8080"
     healthcheck:
@@ -48,3 +76,4 @@ services:
 
 volumes:
   postgres_data:
+  kafka_data:

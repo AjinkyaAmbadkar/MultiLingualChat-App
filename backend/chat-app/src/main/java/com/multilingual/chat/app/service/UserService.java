@@ -16,9 +16,11 @@ public class UserService {
     private static final Logger log = LoggerFactory.getLogger(UserService.class);
 
     private final UserRepository userRepository;
+    private final UserLanguageCacheService languageCache;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, UserLanguageCacheService languageCache) {
         this.userRepository = userRepository;
+        this.languageCache = languageCache;
     }
 
     public User createUser(User user) {
@@ -77,7 +79,9 @@ public class UserService {
         User user = getUserByEmail(email);
         user.setPreferredLanguage(newLanguage);
         User savedUser = userRepository.save(user);
-        log.info("Language updated successfully | userId: {}", savedUser.getId());
+        // Write-through: keep cache consistent immediately after DB update
+        languageCache.updateCachedLanguage(savedUser.getId(), newLanguage);
+        log.info("Language updated in DB and cache | userId: {}", savedUser.getId());
         return savedUser;
     }
 
