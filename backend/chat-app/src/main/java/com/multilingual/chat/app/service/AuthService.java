@@ -39,6 +39,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final EncryptionService encryptionService;
+    private final UserLanguageCacheService userLanguageCacheService;
 
     @Value("${jwt.refresh-token-expiration}")
     private long refreshTokenExpirationMs;
@@ -51,13 +52,15 @@ public class AuthService {
                        JwtService jwtService,
                        PasswordEncoder passwordEncoder,
                        AuthenticationManager authenticationManager,
-                       EncryptionService encryptionService) {
+                       EncryptionService encryptionService,
+                       UserLanguageCacheService userLanguageCacheService) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.encryptionService = encryptionService;
+        this.userLanguageCacheService = userLanguageCacheService;
     }
 
     // ── Register ──────────────────────────────────────────────────────────────
@@ -246,6 +249,16 @@ public class AuthService {
 
             // Existing GOOGLE user — update picture in case it changed
             user.setPictureUrl(picture);
+
+            // Migrate legacy "en" language code to "English" so it matches the full
+            // language names used everywhere else (isTranslationRequired compares strings
+            // literally — "en" vs "English" caused unnecessary OpenAI calls)
+            if ("en".equalsIgnoreCase(user.getPreferredLanguage())) {
+                user.setPreferredLanguage("English");
+                userLanguageCacheService.updateCachedLanguage(user.getId(), "English");
+                log.info("Migrated preferred language en → English | userId: {}", user.getId());
+            }
+
             user = userRepository.save(user);
             log.info("Existing Google user logged in | userId: {}", user.getId());
 
@@ -258,7 +271,7 @@ public class AuthService {
             user.setPictureUrl(picture);
             user.setProvider(AuthProvider.GOOGLE);
             user.setVerified(true);           // Google has already verified their email
-            user.setPreferredLanguage("en");  // Default — user can change later
+            user.setPreferredLanguage("English");  // Default — user can change later
 
             // No passwordHash for Google users — they authenticate via Google, not a password
             user = userRepository.save(user);
