@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { useChat } from '../../context/ChatContext'
 import ConversationItem, { Avatar } from './ConversationItem'
 import NewChatModal from './NewChatModal'
@@ -13,6 +14,7 @@ export default function Sidebar() {
           setMessages }                   = useChat()
   const [showModal, setShowModal]         = useState(false)
   const [showSettings, setShowSettings]   = useState(false)
+  const isMobile                          = useIsMobile()
 
   function handleSelectUser(user) {
     setShowModal(false)
@@ -31,9 +33,9 @@ export default function Sidebar() {
 
   return (
     <aside style={{
-      width: '300px', flexShrink: 0,
+      width: isMobile ? '100%' : '300px', flexShrink: 0,
       background: '#0f172a',
-      display: 'flex', flexDirection: 'column', height: '100vh',
+      display: 'flex', flexDirection: 'column', height: '100dvh',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
     }}>
 

@@ -35,10 +35,11 @@ export default function SettingsModal({ onClose }) {
     <div style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      padding: '16px',
     }} onClick={onClose}>
       <div style={{
         background: '#fff', borderRadius: '16px', padding: '28px',
-        width: '360px', boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+        width: '100%', maxWidth: '360px', boxSizing: 'border-box', boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       }} onClick={e => e.stopPropagation()}>
 

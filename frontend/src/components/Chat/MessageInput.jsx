@@ -38,7 +38,8 @@ export default function MessageInput({ onSend, onTyping, disabled }) {
         placeholder="Type a message…"
         style={{
           flex: 1, padding: '11px 18px', border: '1.5px solid #e2e8f0',
-          borderRadius: '24px', fontSize: '14px', outline: 'none',
+          // 16px minimum — anything smaller makes iOS Safari auto-zoom when the input gets focus
+          borderRadius: '24px', fontSize: '16px', outline: 'none',
           background: '#f8fafc', color: '#1e293b', transition: 'border-color .2s',
           boxSizing: 'border-box',
         }}

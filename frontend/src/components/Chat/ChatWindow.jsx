@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useChat } from '../../context/ChatContext'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { fetchOnlineStatus } from '../../api/users'
 import { getChatHistory } from '../../api/messages'
 import { decryptMessage } from '../../utils/crypto'
@@ -10,7 +11,8 @@ import MessageInput from './MessageInput'
 
 export default function ChatWindow({ sendMessage, sendTyping, sendReadReceipt }) {
   const { auth, privateKey }                                          = useAuth()
-  const { activeConversation, messages, setMessages, typingUsers, onlineUsers, setPresence } = useChat()
+  const { activeConversation, setActiveConversation, messages, setMessages, typingUsers, onlineUsers, setPresence } = useChat()
+  const isMobile = useIsMobile()
 
   const isPartnerTyping = activeConversation && typingUsers[activeConversation.userId]
   const isPartnerOnline = activeConversation && onlineUsers[activeConversation.userId]
@@ -85,17 +87,33 @@ export default function ChatWindow({ sendMessage, sendTyping, sendReadReceipt })
 
   return (
     <div style={{
-      flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden',
+      flex: 1, display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       background: '#f8fafc',
     }}>
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: '12px',
-        padding: '14px 24px', background: '#fff',
+        padding: isMobile ? '10px 12px' : '14px 24px', background: '#fff',
         borderBottom: '1px solid #e2e8f0',
         boxShadow: '0 1px 6px rgba(0,0,0,0.06)',
       }}>
+        {isMobile && (
+          <button
+            onClick={() => setActiveConversation(null)}
+            aria-label="Back to conversations"
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0,
+              width: '40px', height: '40px', borderRadius: '50%', marginRight: '-4px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+              fill="none" stroke="#0f172a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+        )}
         <Avatar name={activeConversation.name} pictureUrl={activeConversation.pictureUrl} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
           <span style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>
@@ -122,8 +140,8 @@ export default function ChatWindow({ sendMessage, sendTyping, sendReadReceipt })
 
       {/* Messages */}
       <div style={{
-        flex: 1, overflowY: 'auto', padding: '16px 24px',
-        background: '#f1f5f9',
+        flex: 1, overflowY: 'auto', padding: isMobile ? '12px' : '16px 24px',
+        background: '#f1f5f9', WebkitOverflowScrolling: 'touch',
       }}>
         {grouped.map(({ date, msgs }) => (
           <div key={date}>

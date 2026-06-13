@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { login, register, googleLogin } from '../../api/auth'
 import { getMe } from '../../api/users'
 
@@ -7,36 +8,41 @@ const LANGUAGES = ['English','Spanish','French','German','Hindi','Marathi','Japa
 const GOOGLE_CLIENT_ID = '341789138413-lc0evlvskf9mq747k8r5n2a4dle671if.apps.googleusercontent.com'
 
 const S = {
-  page: {
-    minHeight: '100vh', display: 'flex',
+  page: (mobile) => ({
+    minHeight: '100dvh', display: 'flex',
+    flexDirection: mobile ? 'column' : 'row',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
     background: '#0f172a',
-  },
-  left: {
-    flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center',
-    padding: '60px 64px',
+  }),
+  left: (mobile) => ({
+    flex: mobile ? 'none' : 1, display: 'flex', flexDirection: 'column',
+    justifyContent: 'center',
+    padding: mobile ? '28px 24px 24px' : '60px 64px',
     background: 'linear-gradient(160deg, #0f172a 0%, #1e3a5f 60%, #1e40af 100%)',
-  },
-  right: {
-    width: '480px', flexShrink: 0, background: '#fff',
+  }),
+  right: (mobile) => ({
+    width: mobile ? '100%' : '480px', flexShrink: 0, background: '#fff',
     display: 'flex', flexDirection: 'column', justifyContent: 'center',
-    padding: '48px 48px',
-    minHeight: '100vh',
-  },
-  logo: {
-    display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '48px',
-  },
-  logoIcon: {
-    width: '48px', height: '48px', borderRadius: '14px',
+    padding: mobile ? '28px 24px 36px' : '48px 48px',
+    minHeight: mobile ? 'auto' : '100vh',
+    borderRadius: mobile ? '20px 20px 0 0' : 0,
+    flex: mobile ? 1 : 'none',
+    boxSizing: 'border-box',
+  }),
+  logo: (mobile) => ({
+    display: 'flex', alignItems: 'center', gap: '12px', marginBottom: mobile ? '14px' : '48px',
+  }),
+  logoIcon: (mobile) => ({
+    width: mobile ? '36px' : '48px', height: mobile ? '36px' : '48px', borderRadius: mobile ? '11px' : '14px',
     background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: '24px',
-  },
+    fontSize: mobile ? '18px' : '24px',
+  }),
   logoText: { fontSize: '20px', fontWeight: 700, color: '#fff', letterSpacing: '-0.3px' },
-  tagline: {
-    fontSize: '48px', fontWeight: 800, color: '#fff',
-    lineHeight: 1.1, letterSpacing: '-1px', marginBottom: '24px',
-  },
+  tagline: (mobile) => ({
+    fontSize: mobile ? '24px' : '48px', fontWeight: 800, color: '#fff',
+    lineHeight: 1.15, letterSpacing: mobile ? '-0.5px' : '-1px', marginBottom: mobile ? 0 : '24px',
+  }),
   taglineAccent: { color: '#60a5fa' },
   sub: { fontSize: '16px', color: '#94a3b8', lineHeight: 1.7, maxWidth: '420px' },
   features: { marginTop: '48px', display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -61,7 +67,8 @@ const S = {
   label: { display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' },
   input: (focused) => ({
     width: '100%', padding: '11px 14px', border: `1.5px solid ${focused ? '#3b82f6' : '#e2e8f0'}`,
-    borderRadius: '10px', fontSize: '14px', color: '#0f172a', background: '#f8fafc',
+    // 16px so iOS Safari doesn't auto-zoom when the field gets focus
+    borderRadius: '10px', fontSize: '16px', color: '#0f172a', background: '#f8fafc',
     outline: 'none', boxSizing: 'border-box', transition: 'all .2s',
     boxShadow: focused ? '0 0 0 3px rgba(59,130,246,0.12)' : 'none',
   }),
@@ -88,6 +95,7 @@ const S = {
 
 export default function AuthPage() {
   const { signIn } = useAuth()
+  const isMobile = useIsMobile()
   const [tab, setTab]         = useState('login')
   const [error, setError]     = useState('')
   const [loading, setLoading] = useState(false)
@@ -143,42 +151,50 @@ export default function AuthPage() {
   }
 
   return (
-    <div style={S.page}>
-      {/* Left — branding */}
-      <div style={S.left}>
-        <div style={S.logo}>
-          <div style={S.logoIcon}>💬</div>
+    <div style={S.page(isMobile)}>
+      {/* Branding — full panel on desktop, compact header strip on mobile */}
+      <div style={S.left(isMobile)}>
+        <div style={S.logo(isMobile)}>
+          <div style={S.logoIcon(isMobile)}>💬</div>
           <span style={S.logoText}>MultiLingual Chat</span>
         </div>
 
-        <h1 style={S.tagline}>
-          Chat without<br />
-          <span style={S.taglineAccent}>Hassle or</span><br />
-          Language Barrier
-        </h1>
+        {isMobile ? (
+          <h1 style={S.tagline(true)}>
+            Chat without <span style={S.taglineAccent}>Hassle or</span> Language Barrier
+          </h1>
+        ) : (
+          <>
+            <h1 style={S.tagline(false)}>
+              Chat without<br />
+              <span style={S.taglineAccent}>Hassle or</span><br />
+              Language Barrier
+            </h1>
 
-        <p style={S.sub}>
-          Type in your language. Your friends read in theirs.
-          Powered by OpenAI — translation happens automatically, invisibly.
-        </p>
+            <p style={S.sub}>
+              Type in your language. Your friends read in theirs.
+              Powered by OpenAI — translation happens automatically, invisibly.
+            </p>
 
-        <div style={S.features}>
-          {[
-            { icon: '🌍', text: 'Supports English, Spanish, Hindi, Japanese, French & more' },
-            { icon: '⚡', text: 'Real-time delivery over WebSocket — zero delay' },
-            { icon: '🔒', text: 'Secured with JWT + Google OAuth2 — your data is yours' },
-            { icon: '💰', text: 'Translation called only when languages differ — cost efficient' },
-          ].map(f => (
-            <div key={f.icon} style={S.feature}>
-              <div style={S.featureIcon}>{f.icon}</div>
-              <span style={S.featureText}>{f.text}</span>
+            <div style={S.features}>
+              {[
+                { icon: '🌍', text: 'Supports English, Spanish, Hindi, Japanese, French & more' },
+                { icon: '⚡', text: 'Real-time delivery over WebSocket — zero delay' },
+                { icon: '🔒', text: 'Secured with JWT + Google OAuth2 — your data is yours' },
+                { icon: '💰', text: 'Translation called only when languages differ — cost efficient' },
+              ].map(f => (
+                <div key={f.icon} style={S.feature}>
+                  <div style={S.featureIcon}>{f.icon}</div>
+                  <span style={S.featureText}>{f.text}</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )}
       </div>
 
-      {/* Right — form */}
-      <div style={S.right}>
+      {/* Form */}
+      <div style={S.right(isMobile)}>
         <div style={S.formTitle}>Welcome back</div>
         <div style={S.formSub}>Sign in to your account or create a new one</div>
 

@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 export default function MessageBubble({ message, isSent }) {
   const [showOriginal, setShowOriginal] = useState(false)
+  const isMobile = useIsMobile()
 
   const time = message.timestamp
     ? new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -19,7 +21,7 @@ export default function MessageBubble({ message, isSent }) {
   return (
     <div style={{ display: 'flex', justifyContent: isSent ? 'flex-end' : 'flex-start', marginBottom: '6px' }}>
       <div style={{
-        maxWidth: '65%',
+        maxWidth: isMobile ? '82%' : '65%',
         padding: '10px 14px 8px',
         borderRadius: isSent ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
         background: isSent ? '#1d4ed8' : '#ffffff',

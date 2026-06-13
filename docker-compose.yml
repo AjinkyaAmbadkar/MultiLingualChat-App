@@ -73,6 +73,11 @@ services:
       - backend
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      # Self-signed cert for LAN HTTPS — Web Crypto needs a secure context on phones.
+      # Regenerate with openssl if your LAN IP changes (SAN must include the IP).
+      - ./frontend/certs:/etc/nginx/certs:ro
 
 volumes:
   postgres_data:
