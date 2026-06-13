@@ -107,6 +107,17 @@ public class MessageResponseDto {
     public boolean isRead() { return isRead; }
     public void setRead(boolean isRead) { this.isRead = isRead; }
 
+    // Kept for internal use, but excluded from JSON: LocalDateTime serializes without a
+    // timezone (e.g. "2026-06-13T17:33:29.993"), which browsers read as local time and
+    // display as raw UTC. We emit a UTC Instant ("...Z") below so clients can localize.
+    @com.fasterxml.jackson.annotation.JsonIgnore
     public LocalDateTime getTimestamp() { return timestamp; }
     public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
+
+    // Serialized as the "timestamp" field: a UTC instant with a 'Z' suffix so the
+    // frontend's toLocaleTimeString()/toLocaleDateString() convert to each user's local zone.
+    @com.fasterxml.jackson.annotation.JsonProperty("timestamp")
+    public java.time.Instant getTimestampUtc() {
+        return timestamp == null ? null : timestamp.toInstant(java.time.ZoneOffset.UTC);
+    }
 }

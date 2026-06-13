@@ -91,7 +91,7 @@ public class MessageService {
         message.setAesIvOriginal(Base64.getEncoder().encodeToString(ivOriginal));
         message.setAesIvTranslated(Base64.getEncoder().encodeToString(ivOriginal)); // same IV for placeholder
         message.setAesIvSender(Base64.getEncoder().encodeToString(ivOriginal));     // same IV for placeholder
-        message.setTimestamp(LocalDateTime.now());
+        message.setTimestamp(LocalDateTime.now(java.time.ZoneOffset.UTC)); // store UTC so clients can localize
         message.setStatus(MessageStatus.PENDING);
 
         Message saved = messageRepository.save(message);
