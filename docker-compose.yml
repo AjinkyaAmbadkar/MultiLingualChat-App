@@ -25,6 +25,36 @@ services:
       timeout: 10s
       retries: 5
 
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-chatapp}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      # Enables the STOMP plugin (port 61613) that the backend's broker relay connects to
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      # Management UI at http://localhost:15672 (login with RABBITMQ_USER/PASSWORD) — handy for debugging
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -49,6 +79,10 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL:      jdbc:postgresql://postgres:5432/chatapp
       SPRING_DATASOURCE_USERNAME: chatapp_user
@@ -57,6 +91,12 @@ services:
       GOOGLE_CLIENT_ID:           ${GOOGLE_CLIENT_ID}
       JWT_SECRET:                 ${JWT_SECRET}
       KAFKA_BOOTSTRAP_SERVERS:    kafka:9092
+      RABBITMQ_HOST:              rabbitmq
+      RABBITMQ_STOMP_PORT:        "61613"
+      RABBITMQ_USER:              ${RABBITMQ_USER:-chatapp}
+      RABBITMQ_PASSWORD:          ${RABBITMQ_PASSWORD}
+      REDIS_HOST:                 redis
+      REDIS_PORT:                 "6379"
     expose:
       - "8080"
     healthcheck:
@@ -65,12 +105,25 @@ services:
       timeout: 5s
       retries: 5
 
+  # Sticky-session load balancer in front of the (possibly multiple) backend
+  # replicas. Required for SockJS: all of a client's requests must hit one instance.
+  # Run multiple backends with:  docker compose up -d --scale backend=2
+  loadbalancer:
+    image: haproxy:2.9-alpine
+    restart: unless-stopped
+    depends_on:
+      - backend
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    expose:
+      - "8080"
+
   frontend:
     build:
       context: ./frontend
     restart: unless-stopped
     depends_on:
-      - backend
+      - loadbalancer
     ports:
       - "80:80"
       - "443:443"
@@ -82,3 +135,5 @@ services:
 volumes:
   postgres_data:
   kafka_data:
+  rabbitmq_data:
+  redis_data:

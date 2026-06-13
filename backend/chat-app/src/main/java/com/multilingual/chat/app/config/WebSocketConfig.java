@@ -1,5 +1,6 @@
 package com.multilingual.chat.app.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.simp.config.ChannelRegistration;
@@ -42,6 +43,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     // and all other infrastructure are fully initialized.
     private final JwtChannelInterceptor jwtChannelInterceptor;
 
+    // RabbitMQ STOMP relay coordinates — injected from application.properties.
+    @Value("${app.broker.relay-host}") private String relayHost;
+    @Value("${app.broker.relay-port}") private int relayPort;
+    @Value("${app.broker.login}")      private String brokerLogin;
+    @Value("${app.broker.passcode}")   private String brokerPasscode;
+
     public WebSocketConfig(@Lazy JwtChannelInterceptor jwtChannelInterceptor) {
         this.jwtChannelInterceptor = jwtChannelInterceptor;
     }
@@ -75,14 +82,27 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
      * e.g. server sends to "/topic/user.2" → delivered to all clients subscribed
      * there
      *
-     * enableSimpleBroker() uses an in-memory broker (perfect for development).
-     * Later you can swap it for a real broker like RabbitMQ or Redis for production
-     * scale.
+     * We use a STOMP broker RELAY to RabbitMQ instead of the in-memory simple broker.
+     * The simple broker keeps subscriptions in each instance's RAM, so a message
+     * published on instance A never reaches a client connected to instance B.
+     * The relay forwards all "/topic" traffic to a shared RabbitMQ broker (STOMP
+     * plugin, port 61613), so delivery works no matter which instance a client is on.
+     *
+     * clientLogin/Passcode  — used for the per-client connections the relay opens.
+     * systemLogin/Passcode  — used for the single shared "system" connection the
+     *                          relay uses to send server-originated messages
+     *                          (e.g. our convertAndSend(...) calls).
      */
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
         config.setApplicationDestinationPrefixes("/app"); // prefix for @MessageMapping routes
-        config.enableSimpleBroker("/topic"); // prefix for server → client pushes
+        config.enableStompBrokerRelay("/topic")
+                .setRelayHost(relayHost)
+                .setRelayPort(relayPort)
+                .setClientLogin(brokerLogin)
+                .setClientPasscode(brokerPasscode)
+                .setSystemLogin(brokerLogin)
+                .setSystemPasscode(brokerPasscode);
     }
 
     /**

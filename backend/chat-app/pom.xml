@@ -70,10 +70,17 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-cache</artifactId>
 		</dependency>
-		<!-- Caffeine: high-performance in-memory cache (no extra service needed) -->
+		<!-- Redis: shared cache + presence store across instances (replaces Caffeine,
+		     which was per-instance and broke once we run more than one backend). -->
 		<dependency>
-			<groupId>com.github.ben-manes.caffeine</groupId>
-			<artifactId>caffeine</artifactId>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
+		<!-- Reactor Netty: TCP client used by the STOMP broker relay to talk to RabbitMQ.
+		     Required on the classpath for config.enableStompBrokerRelay(...) to work. -->
+		<dependency>
+			<groupId>io.projectreactor.netty</groupId>
+			<artifactId>reactor-netty</artifactId>
 		</dependency>
 
 		<!-- Kafka: async translation job queue -->

@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-plugins
+  namespace: chatapp
+data:
+  enabled_plugins: "[rabbitmq_management,rabbitmq_stomp]."
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: chatapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: rabbitmq }
+  template:
+    metadata:
+      labels: { app: rabbitmq }
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3.13-management
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              valueFrom: { secretKeyRef: { name: chatapp-secrets, key: RABBITMQ_USER } }
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom: { secretKeyRef: { name: chatapp-secrets, key: RABBITMQ_PASSWORD } }
+          ports:
+            - { containerPort: 61613 }  # STOMP (broker relay connects here)
+            - { containerPort: 5672 }   # AMQP
+            - { containerPort: 15672 }  # management UI
+          volumeMounts:
+            - name: plugins
+              mountPath: /etc/rabbitmq/enabled_plugins
+              subPath: enabled_plugins
+      volumes:
+        - name: plugins
+          configMap: { name: rabbitmq-plugins }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: chatapp
+spec:
+  selector: { app: rabbitmq }
+  ports:
+    - { name: stomp,      port: 61613, targetPort: 61613 }
+    - { name: amqp,       port: 5672,  targetPort: 5672 }
+    - { name: management, port: 15672, targetPort: 15672 }
