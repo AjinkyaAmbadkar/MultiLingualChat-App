@@ -3,9 +3,31 @@ import { useAuth } from '../../context/AuthContext'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import { login, register, googleLogin } from '../../api/auth'
 import { getMe } from '../../api/users'
+import ContactModal from '../Contact/ContactModal'
 
 const LANGUAGES = ['English','Spanish','French','German','Hindi','Marathi','Japanese','Portuguese','Mandarin']
 const GOOGLE_CLIENT_ID = '341789138413-lc0evlvskf9mq747k8r5n2a4dle671if.apps.googleusercontent.com'
+
+// Same message, auto-cycled through languages to demo the core feature live.
+const DEMO = [
+  { lang: 'Español',  text: '¡Hola! ¿Seguimos viéndonos hoy?' },
+  { lang: 'हिन्दी',     text: 'नमस्ते! क्या हम आज भी मिल रहे हैं?' },
+  { lang: '日本語',    text: 'やあ！今日はまだ会える？' },
+  { lang: 'Français', text: "Salut ! On se voit toujours aujourd'hui ?" },
+  { lang: 'Deutsch',  text: 'Hey! Treffen wir uns heute noch?' },
+]
+
+// Keyframes can't be expressed inline, so they live in one injected <style> block.
+const KEYFRAMES = `
+@keyframes plAurora  {0%{transform:translate(0,0) scale(1)}50%{transform:translate(30px,-20px) scale(1.15)}100%{transform:translate(0,0) scale(1)}}
+@keyframes plAurora2 {0%{transform:translate(0,0) scale(1.1)}50%{transform:translate(-26px,24px) scale(.95)}100%{transform:translate(0,0) scale(1.1)}}
+@keyframes plFloat   {0%{transform:translateY(0)}50%{transform:translateY(-8px)}100%{transform:translateY(0)}}
+@keyframes plCaret   {0%,100%{opacity:1}50%{opacity:0}}
+@keyframes plRise    {0%{opacity:0;transform:translateY(14px)}100%{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){
+  .pl-aurora,.pl-chip,.pl-caret{animation:none !important}
+}
+`
 
 const S = {
   page: (mobile) => ({
@@ -15,11 +37,16 @@ const S = {
     background: '#0f172a',
   }),
   left: (mobile) => ({
-    flex: mobile ? 'none' : 1, display: 'flex', flexDirection: 'column',
-    justifyContent: 'center',
+    flex: mobile ? 'none' : 1, position: 'relative', overflow: 'hidden',
+    display: 'flex', flexDirection: 'column', justifyContent: 'center',
     padding: mobile ? '28px 24px 24px' : '60px 64px',
-    background: 'linear-gradient(160deg, #0f172a 0%, #1e3a5f 60%, #1e40af 100%)',
+    background: 'linear-gradient(160deg, #0f172a 0%, #1b2f5c 55%, #2742a8 100%)',
   }),
+  blob: (cfg) => ({
+    position: 'absolute', borderRadius: '50%', filter: 'blur(44px)',
+    pointerEvents: 'none', ...cfg,
+  }),
+  inner: { position: 'relative', zIndex: 1 },
   right: (mobile) => ({
     width: mobile ? '100%' : '480px', flexShrink: 0, background: '#fff',
     display: 'flex', flexDirection: 'column', justifyContent: 'center',
@@ -30,29 +57,40 @@ const S = {
     boxSizing: 'border-box',
   }),
   logo: (mobile) => ({
-    display: 'flex', alignItems: 'center', gap: '12px', marginBottom: mobile ? '14px' : '48px',
-  }),
-  logoIcon: (mobile) => ({
-    width: mobile ? '36px' : '48px', height: mobile ? '36px' : '48px', borderRadius: mobile ? '11px' : '14px',
-    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: mobile ? '18px' : '24px',
+    display: 'flex', alignItems: 'center', gap: '12px', marginBottom: mobile ? '14px' : '40px',
   }),
   logoText: { fontSize: '20px', fontWeight: 700, color: '#fff', letterSpacing: '-0.3px' },
   tagline: (mobile) => ({
-    fontSize: mobile ? '24px' : '48px', fontWeight: 800, color: '#fff',
-    lineHeight: 1.15, letterSpacing: mobile ? '-0.5px' : '-1px', marginBottom: mobile ? 0 : '24px',
+    fontSize: mobile ? '24px' : '46px', fontWeight: 800, color: '#fff',
+    lineHeight: 1.12, letterSpacing: mobile ? '-0.5px' : '-1px', marginBottom: mobile ? 0 : '18px',
   }),
-  taglineAccent: { color: '#60a5fa' },
-  sub: { fontSize: '16px', color: '#94a3b8', lineHeight: 1.7, maxWidth: '420px' },
-  features: { marginTop: '48px', display: 'flex', flexDirection: 'column', gap: '16px' },
-  feature: { display: 'flex', alignItems: 'center', gap: '14px' },
-  featureIcon: {
-    width: '36px', height: '36px', borderRadius: '10px',
-    background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0,
+  taglineAccent: {
+    background: 'linear-gradient(90deg, #a78bfa, #38bdf8)',
+    WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
   },
-  featureText: { fontSize: '14px', color: '#cbd5e1' },
+  sub: { fontSize: '15px', color: '#94a3b8', lineHeight: 1.7, maxWidth: '400px', marginBottom: '26px' },
+
+  demoCard: {
+    background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
+    borderRadius: '16px', padding: '16px', maxWidth: '340px',
+    backdropFilter: 'blur(4px)', animation: 'plRise .6s ease both',
+  },
+  bubbleOut: {
+    background: '#1d4ed8', color: '#fff', fontSize: '14px', padding: '9px 13px',
+    borderRadius: '14px 14px 4px 14px', maxWidth: '86%',
+  },
+  demoLabel: { display: 'flex', alignItems: 'center', gap: '7px', margin: '10px 0 7px' },
+  demoDot: { width: '7px', height: '7px', borderRadius: '50%', background: '#38bdf8', flexShrink: 0 },
+  bubbleIn: {
+    background: '#fff', color: '#0f172a', fontSize: '14px', padding: '9px 13px',
+    borderRadius: '14px 14px 14px 4px', maxWidth: '92%',
+  },
+  chips: { marginTop: '20px', display: 'flex', flexWrap: 'wrap', gap: '8px' },
+  chip: (delay) => ({
+    fontSize: '12px', color: '#cbd5e1', background: 'rgba(99,102,241,0.15)',
+    border: '1px solid rgba(99,102,241,0.3)', borderRadius: '20px', padding: '5px 12px',
+    animation: 'plFloat 4s ease-in-out infinite', animationDelay: `${delay}s`,
+  }),
 
   formTitle: { fontSize: '26px', fontWeight: 800, color: '#0f172a', marginBottom: '6px', letterSpacing: '-0.5px' },
   formSub: { fontSize: '14px', color: '#64748b', marginBottom: '28px' },
@@ -74,10 +112,10 @@ const S = {
   }),
   field: { marginBottom: '16px' },
   btn: {
-    width: '100%', padding: '13px', background: '#1d4ed8', color: '#fff',
+    width: '100%', padding: '13px', background: 'linear-gradient(135deg, #4f46e5, #1d4ed8)', color: '#fff',
     border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700,
     cursor: 'pointer', marginTop: '4px', letterSpacing: '0.1px',
-    boxShadow: '0 4px 14px rgba(29,78,216,0.35)',
+    boxShadow: '0 4px 14px rgba(29,78,216,0.35)', transition: 'transform .15s ease, box-shadow .15s ease',
   },
   divider: { display: 'flex', alignItems: 'center', gap: '12px', margin: '20px 0' },
   divLine: { flex: 1, height: '1px', background: '#e2e8f0' },
@@ -86,6 +124,7 @@ const S = {
     width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
     gap: '10px', padding: '12px', border: '1.5px solid #e2e8f0', borderRadius: '12px',
     background: '#fff', fontSize: '14px', fontWeight: 600, color: '#374151', cursor: 'pointer',
+    transition: 'background .2s',
   },
   error: {
     background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626',
@@ -105,6 +144,7 @@ export default function AuthPage() {
   const [regEmail, setRegEmail] = useState('')
   const [regPass, setRegPass]   = useState('')
   const [regLang, setRegLang]   = useState('English')
+  const [showContact, setShowContact] = useState(false)
 
   useEffect(() => {
     const s = document.createElement('script')
@@ -152,45 +192,49 @@ export default function AuthPage() {
 
   return (
     <div style={S.page(isMobile)}>
+      <style>{KEYFRAMES}</style>
+
       {/* Branding — full panel on desktop, compact header strip on mobile */}
       <div style={S.left(isMobile)}>
-        <div style={S.logo(isMobile)}>
-          <div style={S.logoIcon(isMobile)}>💬</div>
-          <span style={S.logoText}>MultiLingual Chat</span>
-        </div>
-
-        {isMobile ? (
-          <h1 style={S.tagline(true)}>
-            Chat without <span style={S.taglineAccent}>Hassle or</span> Language Barrier
-          </h1>
-        ) : (
+        {!isMobile && (
           <>
-            <h1 style={S.tagline(false)}>
-              Chat without<br />
-              <span style={S.taglineAccent}>Hassle or</span><br />
-              Language Barrier
-            </h1>
-
-            <p style={S.sub}>
-              Type in your language. Your friends read in theirs.
-              Powered by OpenAI — translation happens automatically, invisibly.
-            </p>
-
-            <div style={S.features}>
-              {[
-                { icon: '🌍', text: 'Supports English, Spanish, Hindi, Japanese, French & more' },
-                { icon: '⚡', text: 'Real-time delivery over WebSocket — zero delay' },
-                { icon: '🔒', text: 'Secured with JWT + Google OAuth2 — your data is yours' },
-                { icon: '💰', text: 'Translation called only when languages differ — cost efficient' },
-              ].map(f => (
-                <div key={f.icon} style={S.feature}>
-                  <div style={S.featureIcon}>{f.icon}</div>
-                  <span style={S.featureText}>{f.text}</span>
-                </div>
-              ))}
-            </div>
+            <div className="pl-aurora" style={S.blob({ width: '300px', height: '300px', top: '-80px', left: '-60px', background: 'radial-gradient(circle, #634bff, transparent 60%)', opacity: 0.5, animation: 'plAurora 9s ease-in-out infinite' })} />
+            <div className="pl-aurora" style={S.blob({ width: '280px', height: '280px', bottom: '-70px', right: '-40px', background: 'radial-gradient(circle, #38bdf8, transparent 60%)', opacity: 0.38, animation: 'plAurora2 11s ease-in-out infinite' })} />
           </>
         )}
+
+        <div style={S.inner}>
+          <div style={S.logo(isMobile)}>
+            <img src="/favicon.svg" alt="PolyLingual Chat" style={{ width: isMobile ? '36px' : '48px', height: isMobile ? '36px' : '48px' }} />
+            <span style={S.logoText}>PolyLingual Chat</span>
+          </div>
+
+          {isMobile ? (
+            <h1 style={S.tagline(true)}>
+              Chat without <span style={S.taglineAccent}>language barriers</span>
+            </h1>
+          ) : (
+            <>
+              <h1 style={S.tagline(false)}>
+                Chat without<br />
+                <span style={S.taglineAccent}>language barriers.</span>
+              </h1>
+
+              <p style={S.sub}>
+                Type in your language. Your friends read in theirs.
+                Powered by OpenAI — translation happens automatically, invisibly.
+              </p>
+
+              <TranslationDemo />
+
+              <div style={S.chips}>
+                {['English', 'हिन्दी', '日本語', 'Français', 'Español'].map((c, idx) => (
+                  <span key={c} className="pl-chip" style={S.chip(idx * 0.6)}>{c}</span>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Form */}
@@ -213,7 +257,10 @@ export default function AuthPage() {
           <form onSubmit={handleLogin}>
             <Field label="Email" type="email" value={loginEmail} onChange={setLoginEmail} placeholder="you@example.com" />
             <Field label="Password" type="password" value={loginPassword} onChange={setLoginPassword} placeholder="Enter your password" />
-            <button type="submit" disabled={loading} style={{ ...S.btn, opacity: loading ? 0.7 : 1 }}>
+            <button type="submit" disabled={loading} style={{ ...S.btn, opacity: loading ? 0.7 : 1 }}
+              onMouseEnter={e => { if (!loading) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 22px rgba(99,75,255,0.45)' } }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(29,78,216,0.35)' }}
+            >
               {loading ? 'Signing in…' : 'Sign In →'}
             </button>
           </form>
@@ -228,7 +275,10 @@ export default function AuthPage() {
                 {LANGUAGES.map(l => <option key={l}>{l}</option>)}
               </select>
             </div>
-            <button type="submit" disabled={loading} style={{ ...S.btn, opacity: loading ? 0.7 : 1 }}>
+            <button type="submit" disabled={loading} style={{ ...S.btn, opacity: loading ? 0.7 : 1 }}
+              onMouseEnter={e => { if (!loading) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 22px rgba(99,75,255,0.45)' } }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(29,78,216,0.35)' }}
+            >
               {loading ? 'Creating account…' : 'Create Account →'}
             </button>
           </form>
@@ -246,6 +296,51 @@ export default function AuthPage() {
         >
           <GoogleIcon /> Continue with Google
         </button>
+
+        <p style={{ marginTop: '22px', textAlign: 'center', fontSize: '13px', color: '#94a3b8' }}>
+          Have feedback or want to connect?{' '}
+          <button type="button" onClick={() => setShowContact(true)}
+            style={{ background: 'none', border: 'none', padding: 0, color: '#1d4ed8', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}>
+            Contact me
+          </button>
+        </p>
+      </div>
+
+      {showContact && <ContactModal onClose={() => setShowContact(false)} />}
+    </div>
+  )
+}
+
+// Live demo: one message cycling through languages with a typing caret.
+function TranslationDemo() {
+  const [i, setI] = useState(0)
+  const [visible, setVisible] = useState(true)
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setVisible(false)
+      setTimeout(() => { setI(p => (p + 1) % DEMO.length); setVisible(true) }, 260)
+    }, 2600)
+    return () => clearInterval(id)
+  }, [])
+
+  return (
+    <div style={S.demoCard}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={S.bubbleOut}>Hey! Are we still meeting today?</div>
+      </div>
+      <div style={S.demoLabel}>
+        <span style={S.demoDot} />
+        <span style={{ fontSize: '12px', color: '#7dd3fc', fontWeight: 600, opacity: visible ? 1 : 0, transition: 'opacity .26s' }}>
+          {DEMO[i].lang}
+        </span>
+        <span style={{ fontSize: '12px', color: '#64748b' }}>· Priya reads</span>
+      </div>
+      <div style={{ display: 'flex' }}>
+        <div style={S.bubbleIn}>
+          <span style={{ opacity: visible ? 1 : 0, transition: 'opacity .26s' }}>{DEMO[i].text}</span>
+          <span className="pl-caret" style={{ color: '#1d4ed8', animation: 'plCaret 1s step-end infinite' }}>|</span>
+        </div>
       </div>
     </div>
   )

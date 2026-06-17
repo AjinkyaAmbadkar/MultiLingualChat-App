@@ -71,8 +71,8 @@ export default function ChatWindow({ sendMessage, sendTyping, sendReadReceipt })
           width: '80px', height: '80px', borderRadius: '24px',
           background: 'linear-gradient(135deg, #dbeafe, #bfdbfe)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '40px', marginBottom: '20px',
-        }}>💬</div>
+          marginBottom: '20px',
+        }}><img src="/favicon.svg" alt="" style={{ width: '44px', height: '44px' }} /></div>
         <p style={{ margin: '0 0 8px', fontSize: '20px', fontWeight: 700, color: '#1e293b' }}>
           Your messages
         </p>
