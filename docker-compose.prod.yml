@@ -1,0 +1,151 @@
+# Production stack for polylingual.chat.
+#   - Caddy is the public edge on 80/443 with automatic Let's Encrypt TLS.
+#   - frontend (nginx) is internal-only and proxies to the HAProxy load balancer.
+#   - Everything else mirrors docker-compose.yml.
+# Run on the server with:  docker compose -f docker-compose.prod.yml up -d --build
+services:
+
+  kafka:
+    image: confluentinc/cp-kafka:7.7.0
+    restart: unless-stopped
+    environment:
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-chatapp}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       chatapp
+      POSTGRES_USER:     chatapp_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chatapp_user -d chatapp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend/chat-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL:      jdbc:postgresql://postgres:5432/chatapp
+      SPRING_DATASOURCE_USERNAME: chatapp_user
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      OPENAI_API_KEY:             ${OPENAI_API_KEY}
+      GOOGLE_CLIENT_ID:           ${GOOGLE_CLIENT_ID}
+      JWT_SECRET:                 ${JWT_SECRET}
+      KAFKA_BOOTSTRAP_SERVERS:    kafka:9092
+      RABBITMQ_HOST:              rabbitmq
+      RABBITMQ_STOMP_PORT:        "61613"
+      RABBITMQ_USER:              ${RABBITMQ_USER:-chatapp}
+      RABBITMQ_PASSWORD:          ${RABBITMQ_PASSWORD}
+      REDIS_HOST:                 redis
+      REDIS_PORT:                 "6379"
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/test || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  loadbalancer:
+    image: haproxy:2.9-alpine
+    restart: unless-stopped
+    depends_on:
+      - backend
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    expose:
+      - "8080"
+
+  # Internal-only nginx: serves the React build + proxies to the load balancer.
+  # No host ports, no certs — TLS is handled by Caddy in front.
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - loadbalancer
+    volumes:
+      - ./frontend/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+    expose:
+      - "80"
+
+  # Public edge: TLS termination + automatic Let's Encrypt for polylingual.chat.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data       # persists issued certs across restarts (avoids LE rate limits)
+      - caddy_config:/config
+
+volumes:
+  postgres_data:
+  kafka_data:
+  rabbitmq_data:
+  redis_data:
+  caddy_data:
+  caddy_config:

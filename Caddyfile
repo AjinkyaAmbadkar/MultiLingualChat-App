@@ -1,0 +1,14 @@
+# Production edge: terminates TLS with automatic Let's Encrypt certs and reverse-proxies
+# to the internal nginx (frontend) container. Caddy auto-renews certs and redirects 80→443.
+# WebSocket upgrades (/ws via SockJS/STOMP) are proxied transparently by reverse_proxy.
+
+# Canonical host
+polylingual.chat {
+	encode zstd gzip
+	reverse_proxy frontend:80
+}
+
+# Redirect www → apex so there is a single canonical origin (matches the Google OAuth origin).
+www.polylingual.chat {
+	redir https://polylingual.chat{uri} permanent
+}
