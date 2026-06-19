@@ -45,7 +45,7 @@ export default function Sidebar() {
         borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-          <img src="/favicon.svg" alt="PolyLingual Chat" style={{ width: '32px', height: '32px' }} />
+          <img src="/favicon.svg" alt="PolyLingual Chat" style={{ width: '38px', height: '38px' }} />
           <span style={{ fontSize: '15px', fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.2px' }}>
             PolyLingual Chat
           </span>
@@ -95,7 +95,7 @@ export default function Sidebar() {
             justifyContent: 'center', height: '60%', color: '#475569',
             padding: '32px 20px', textAlign: 'center', gap: '10px',
           }}>
-            <img src="/favicon.svg" alt="" style={{ width: '44px', height: '44px', opacity: 0.85 }} />
+            <img src="/favicon.svg" alt="" style={{ width: '50px', height: '50px' }} />
             <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.6, color: '#64748b' }}>
               No conversations yet.<br />Click <strong style={{ color: '#93c5fd' }}>+ New Chat</strong> to start one.
             </p>

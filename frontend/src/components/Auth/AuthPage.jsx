@@ -205,7 +205,7 @@ export default function AuthPage() {
 
         <div style={S.inner}>
           <div style={S.logo(isMobile)}>
-            <img src="/favicon.svg" alt="PolyLingual Chat" style={{ width: isMobile ? '36px' : '48px', height: isMobile ? '36px' : '48px' }} />
+            <img src="/favicon.svg" alt="PolyLingual Chat" style={{ width: isMobile ? '42px' : '54px', height: isMobile ? '42px' : '54px' }} />
             <span style={S.logoText}>PolyLingual Chat</span>
           </div>
 
