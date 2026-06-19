@@ -4,6 +4,12 @@ A real-time chat application that breaks the language barrier — like WhatsApp,
 
 **The idea:** Ajinkya speaks English, his friend Carlos speaks only Spanish. They can't chat. This app lets them — each user sets their preferred language once, and every message they receive is automatically translated into it. In real time.
 
+## 📸 Demo
+
+https://github.com/AjinkyaAmbadkar/MultiLingualChat-App/raw/main/docs/demo.mp4
+
+> If the player above doesn't load, [download/view the demo here](docs/demo.mp4).
+
 ---
 
 ## 🛠️ Tech Stack
@@ -275,6 +281,8 @@ Browser → Google Identity Services JS SDK → Google ID Token
 ---
 
 ## 🌐 Message Flow (async, encrypted)
+
+![Architecture diagram](docs/architecture.png)
 
 ```
 User A types "Hello"
