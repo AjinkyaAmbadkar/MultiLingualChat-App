@@ -14,7 +14,6 @@ const DEMO = [
   { lang: 'हिन्दी',     text: 'नमस्ते! क्या हम आज भी मिल रहे हैं?' },
   { lang: '日本語',    text: 'やあ！今日はまだ会える？' },
   { lang: 'Français', text: "Salut ! On se voit toujours aujourd'hui ?" },
-  { lang: 'Deutsch',  text: 'Hey! Treffen wir uns heute noch?' },
 ]
 
 // Keyframes can't be expressed inline, so they live in one injected <style> block.
