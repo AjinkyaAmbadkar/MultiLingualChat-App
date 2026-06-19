@@ -1,16 +1,27 @@
+import { useState } from 'react'
+import { useIsMobile } from '../../hooks/useIsMobile'
+
 export default function MessageBubble({ message, isSent }) {
+  const [showOriginal, setShowOriginal] = useState(false)
+  const isMobile = useIsMobile()
+
   const time = message.timestamp
     ? new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : ''
 
-  const text = isSent
+  // Sender always sees what they typed. Receiver sees the translated version.
+  // Toggle reveals the other side's text.
+  const preferredText = isSent
     ? message.originalText
     : (message.translatedText || message.originalText)
+
+  const hasOriginal = !isSent && message.originalText && message.originalText !== preferredText
+  const displayText = showOriginal ? message.originalText : preferredText
 
   return (
     <div style={{ display: 'flex', justifyContent: isSent ? 'flex-end' : 'flex-start', marginBottom: '6px' }}>
       <div style={{
-        maxWidth: '65%',
+        maxWidth: isMobile ? '82%' : '65%',
         padding: '10px 14px 8px',
         borderRadius: isSent ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
         background: isSent ? '#1d4ed8' : '#ffffff',
@@ -18,8 +29,23 @@ export default function MessageBubble({ message, isSent }) {
         color: isSent ? '#fff' : '#0f172a',
       }}>
         <p style={{ margin: 0, fontSize: '14px', lineHeight: 1.55, wordBreak: 'break-word' }}>
-          {text}
+          {displayText}
         </p>
+
+        {hasOriginal && (
+          <button
+            onClick={() => setShowOriginal(prev => !prev)}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0 0',
+              fontSize: '11px',
+              color: isSent ? 'rgba(255,255,255,0.55)' : '#94a3b8',
+              textDecoration: 'underline', display: 'block',
+            }}
+          >
+            {showOriginal ? 'See translation' : 'See original'}
+          </button>
+        )}
+
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
           gap: '4px', marginTop: '4px',
@@ -28,7 +54,11 @@ export default function MessageBubble({ message, isSent }) {
             {time}
           </span>
           {isSent && (
-            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)' }}>✓✓</span>
+            <span style={{
+              fontSize: '11px',
+              color: message.isRead ? '#4ade80' : 'rgba(255,255,255,0.5)',
+              fontWeight: message.isRead ? 700 : 400,
+            }}>✓✓</span>
           )}
         </div>
       </div>

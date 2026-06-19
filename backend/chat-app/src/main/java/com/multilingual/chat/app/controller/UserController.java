@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.multilingual.chat.app.dto.UserSummaryDto;
 import com.multilingual.chat.app.entity.User;
+import com.multilingual.chat.app.service.PresenceService;
 import com.multilingual.chat.app.service.UserService;
 
 @RestController
@@ -27,9 +28,11 @@ public class UserController {
 
     private static final Logger log = LoggerFactory.getLogger(UserController.class);
     private final UserService userService;
+    private final PresenceService presenceService;
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService, PresenceService presenceService) {
         this.userService = userService;
+        this.presenceService = presenceService;
     }
 
     @PostMapping
@@ -84,6 +87,11 @@ public class UserController {
      * After this call, every subsequent message they RECEIVE will be translated into
      * the new language — MessageService reads preferredLanguage from DB on every message.
      */
+    @GetMapping("/{id}/online")
+    public ResponseEntity<Map<String, Boolean>> getOnlineStatus(@PathVariable long id) {
+        return ResponseEntity.ok(Map.of("online", presenceService.isOnline(id)));
+    }
+
     @PatchMapping("/me/language")
     public ResponseEntity<?> updateMyLanguage(@RequestBody Map<String, String> body, Principal principal) {
         try {

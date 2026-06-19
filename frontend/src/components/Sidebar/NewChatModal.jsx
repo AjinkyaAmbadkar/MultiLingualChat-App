@@ -26,6 +26,7 @@ export default function NewChatModal({ onSelect, onClose }) {
     <div onClick={onClose} style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50,
+      padding: '16px',
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         background: '#fff', borderRadius: '16px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)',

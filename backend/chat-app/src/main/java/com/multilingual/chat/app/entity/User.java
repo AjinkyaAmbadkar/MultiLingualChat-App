@@ -75,6 +75,20 @@ public class User {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    // ── Encryption keypair fields (Phase 8.5) ─────────────────────────────────
+
+    /** Base64-encoded X.509 RSA-2048 public key. */
+    @Column(name = "public_key", columnDefinition = "TEXT")
+    private String publicKey;
+
+    /** AES-256-GCM encrypted PKCS#8 private key, Base64-encoded. */
+    @Column(name = "encrypted_private_key", columnDefinition = "TEXT")
+    private String encryptedPrivateKey;
+
+    /** Base64-encoded 16-byte PBKDF2 salt used to derive the key-encryption key. */
+    @Column(name = "key_salt", length = 64)
+    private String keySalt;
+
     // ── Constructors ──────────────────────────────────────────────────────────
 
     public User() {
@@ -203,5 +217,29 @@ public class User {
 
     public void setPictureUrl(String pictureUrl) {
         this.pictureUrl = pictureUrl;
+    }
+
+    public String getPublicKey() {
+        return publicKey;
+    }
+
+    public void setPublicKey(String publicKey) {
+        this.publicKey = publicKey;
+    }
+
+    public String getEncryptedPrivateKey() {
+        return encryptedPrivateKey;
+    }
+
+    public void setEncryptedPrivateKey(String encryptedPrivateKey) {
+        this.encryptedPrivateKey = encryptedPrivateKey;
+    }
+
+    public String getKeySalt() {
+        return keySalt;
+    }
+
+    public void setKeySalt(String keySalt) {
+        this.keySalt = keySalt;
     }
 }

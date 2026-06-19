@@ -6,14 +6,41 @@ export function ChatProvider({ children }) {
   const [conversations, setConversations] = useState([])
   const [activeConversation, setActiveConversation] = useState(null) // { userId, name, pictureUrl }
   const [messages, setMessages] = useState([])                        // messages for active conversation
+  const [typingUsers, setTypingUsers] = useState({})                  // { [userId]: true/false }
+  const [onlineUsers, setOnlineUsers] = useState({})                  // { [userId]: true/false }
+
+  const setTyping = useCallback((senderId, isTyping) => {
+    setTypingUsers(prev => ({ ...prev, [senderId]: isTyping }))
+  }, [])
+
+  const setPresence = useCallback((userId, online) => {
+    setOnlineUsers(prev => ({ ...prev, [userId]: online }))
+  }, [])
+
+  // Mark all messages from senderId as read in local state
+  const markMessagesRead = useCallback((senderId) => {
+    setMessages(prev => prev.map(m =>
+      String(m.senderId) === String(senderId) ? { ...m, isRead: true } : m
+    ))
+  }, [])
 
   // Called by useWebSocket when a new message arrives over STOMP
-  const addMessage = useCallback((msg) => {
+  const addMessage = useCallback((msg, myId) => {
     setMessages(prev => {
-      // Avoid duplicates (echo from server may arrive twice in some edge cases)
-      if (prev.some(m => m.id === msg.id)) return prev
+      const existingIndex = prev.findIndex(m => m.id === msg.id)
+      if (existingIndex !== -1) {
+        // Replace with updated version (e.g. Kafka consumer delivered translated message)
+        const next = [...prev]
+        next[existingIndex] = msg
+        return next
+      }
       return [...prev, msg]
     })
+
+    // Show preview in the current user's language
+    const previewText = String(msg.senderId) === String(myId)
+      ? msg.originalText
+      : (msg.translatedText || msg.originalText)
 
     // Update the conversation list preview with the latest message
     setConversations(prev => prev.map(c => {
@@ -21,7 +48,7 @@ export function ChatProvider({ children }) {
         String(c.userId) === String(msg.senderId) ||
         String(c.userId) === String(msg.receiverId)
       if (!isThisConversation) return c
-      return { ...c, lastMessage: msg.translatedText || msg.originalText, lastMessageTime: msg.timestamp }
+      return { ...c, lastMessage: previewText, lastMessageTime: msg.timestamp }
     }))
   }, [])
 
@@ -31,6 +58,9 @@ export function ChatProvider({ children }) {
       activeConversation, setActiveConversation,
       messages, setMessages,
       addMessage,
+      typingUsers, setTyping,
+      onlineUsers, setPresence,
+      markMessagesRead,
     }}>
       {children}
     </ChatContext.Provider>

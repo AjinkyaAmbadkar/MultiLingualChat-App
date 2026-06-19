@@ -1,16 +1,23 @@
 @import "tailwindcss";
 
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30%            { transform: translateY(-5px); opacity: 1; }
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: #f0f2f5;
-  height: 100vh;
+  /* dvh = dynamic viewport height — tracks the real visible area on mobile when
+     the browser address bar shows/hides. 100vh overflows the screen there. */
+  height: 100dvh;
   overflow: hidden;
 }
 
 #root {
-  height: 100vh;
+  height: 100dvh;
 }
 
 /* Custom scrollbar */

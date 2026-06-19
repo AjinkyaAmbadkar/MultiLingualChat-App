@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: chatapp
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: backend }
+  template:
+    metadata:
+      labels: { app: backend }
+    spec:
+      containers:
+        - name: backend
+          image: mutilingualchatapp-backend:latest
+          # Use the image we loaded into minikube; never try to pull from a registry.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - { name: SPRING_DATASOURCE_URL,      value: "jdbc:postgresql://postgres:5432/chatapp" }
+            - { name: SPRING_DATASOURCE_USERNAME, value: chatapp_user }
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom: { secretKeyRef: { name: chatapp-secrets, key: DB_PASSWORD } }
+            - name: OPENAI_API_KEY
+              valueFrom: { secretKeyRef: { name: chatapp-secrets, key: OPENAI_API_KEY } }
+            - name: GOOGLE_CLIENT_ID
+              valueFrom: { secretKeyRef: { name: chatapp-secrets, key: GOOGLE_CLIENT_ID } }
+            - name: JWT_SECRET
+              valueFrom: { secretKeyRef: { name: chatapp-secrets, key: JWT_SECRET } }
+            - { name: KAFKA_BOOTSTRAP_SERVERS, value: "kafka:9092" }
+            - { name: RABBITMQ_HOST,           value: rabbitmq }
+            - { name: RABBITMQ_STOMP_PORT,     value: "61613" }
+            - name: RABBITMQ_USER
+              valueFrom: { secretKeyRef: { name: chatapp-secrets, key: RABBITMQ_USER } }
+            - name: RABBITMQ_PASSWORD
+              valueFrom: { secretKeyRef: { name: chatapp-secrets, key: RABBITMQ_PASSWORD } }
+            - { name: REDIS_HOST, value: redis }
+            - { name: REDIS_PORT, value: "6379" }
+          # Resource requests are REQUIRED for the HPA — it computes CPU utilization
+          # as a percentage of the request (e.g. 50% of 250m = 125m).
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits:   { cpu: "1",  memory: 1Gi }
+          # Java boots in a few seconds; don't route traffic until /test responds 200.
+          readinessProbe:
+            httpGet: { path: /test, port: 8080 }
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet: { path: /test, port: 8080 }
+            initialDelaySeconds: 40
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: chatapp
+spec:
+  selector: { app: backend }
+  ports:
+    - port: 8080
+      targetPort: 8080

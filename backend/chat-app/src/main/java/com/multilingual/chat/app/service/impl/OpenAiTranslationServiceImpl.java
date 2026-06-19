@@ -61,6 +61,45 @@ public class OpenAiTranslationServiceImpl implements TranslationService {
      * No point paying for a translation of "English → English".
      */
     @Override
+    public String translateToLanguage(String text, String targetLanguage) {
+        log.info("Requesting auto-detect translation | to: {} | text length: {} chars", targetLanguage, text.length());
+
+        Map<String, Object> requestBody = Map.of(
+                "model", model,
+                "messages", List.of(
+                        Map.of("role", "system",
+                                "content", "You are a translation assistant. Detect the language of the input and translate it accurately to " + targetLanguage + ". "
+                                        + "Return only the translated text, nothing else. No explanations, no quotes."),
+                        Map.of("role", "user", "content", text)),
+                "temperature", 0.3,
+                "max_tokens", 1000);
+
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> response = restClient.post()
+                    .body(requestBody)
+                    .retrieve()
+                    .body(Map.class);
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
+
+            if (choices == null || choices.isEmpty()) {
+                throw new RuntimeException("OpenAI returned an empty choices list");
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+            String result = (String) message.get("content");
+            log.info("Auto-detect translation successful | to: {}", targetLanguage);
+            return result;
+        } catch (RestClientException e) {
+            log.error("OpenAI auto-detect translation failed | to: {} | error: {}", targetLanguage, e.getMessage(), e);
+            throw new RuntimeException("Translation API call failed: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
     public boolean isTranslationRequired(String sourceLanguage, String targetLanguage) {
         if (sourceLanguage == null || targetLanguage == null) {
             log.debug("No Translation required as Source and Target Language is same.");

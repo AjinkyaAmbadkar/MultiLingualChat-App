@@ -12,6 +12,13 @@ export async function getAllUsers(token) {
   return res.json()
 }
 
+export async function fetchOnlineStatus(token, userId) {
+  const res = await fetch(`${BASE}/${userId}/online`, { headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok) return false
+  const data = await res.json()
+  return data.online
+}
+
 export async function updateLanguage(token, preferredLanguage) {
   const res = await fetch(`${BASE}/me/language`, {
     method: 'PATCH',

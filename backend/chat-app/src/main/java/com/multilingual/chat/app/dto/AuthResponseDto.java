@@ -22,6 +22,13 @@ public class AuthResponseDto {
     private String email;
     private String name;
 
+    /**
+     * Plaintext RSA private key (Base64 PKCS#8), sent to the client over TLS on login/register.
+     * The client must hold this in memory only — NEVER persist it.
+     * NULL for Google OAuth users (no password-derived key available).
+     */
+    private String privateKey;
+
     public AuthResponseDto() {
     }
 
@@ -31,6 +38,11 @@ public class AuthResponseDto {
         this.userId = userId;
         this.email = email;
         this.name = name;
+    }
+
+    public AuthResponseDto(String accessToken, String refreshToken, Long userId, String email, String name, String privateKey) {
+        this(accessToken, refreshToken, userId, email, name);
+        this.privateKey = privateKey;
     }
 
     public String getAccessToken() {
@@ -75,5 +87,13 @@ public class AuthResponseDto {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getPrivateKey() {
+        return privateKey;
+    }
+
+    public void setPrivateKey(String privateKey) {
+        this.privateKey = privateKey;
     }
 }
