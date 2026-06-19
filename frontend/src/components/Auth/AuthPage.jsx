@@ -222,7 +222,7 @@ export default function AuthPage() {
 
               <p style={S.sub}>
                 Type in your language. Your friends read in theirs.
-                Powered by OpenAI — translation happens automatically, invisibly.
+                Powered by OpenAI. Translation happens automatically, invisibly.
               </p>
 
               <TranslationDemo />
